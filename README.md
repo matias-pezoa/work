@@ -15,7 +15,6 @@ Portafolio de experimentos y trabajos en diseño, moda, tecnología y fabricaci�
 │   ├── patron-moda/
 │   ├── lo-que-queda/
 │   ├── pattern-key/
-│   ├── analisis-sesion/
 │   ├── plataforma-parametrica/   (build: no editar a mano)
 │   ├── denat-decart/  denat-ia/  prueba-decart/
 │   └── exercise-01/  exercise-02/  lab-02/
