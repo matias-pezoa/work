@@ -1,12 +1,25 @@
+/* ============================================================
+   PLATAFORMA PARAMETRICA — mismo lenguaje que la home de Work:
+   archivo cientifico / documentacion tecnica. Monocromo,
+   lineas de 1px, Oswald + JetBrains Mono, grano fino.
+   ============================================================ */
 :root {
-  --bg: #141518;
-  --panel: #1c1e23;
-  --panel-2: #23262d;
-  --line: #33373f;
-  --text: #e7e9ee;
-  --muted: #9aa0ac;
-  --accent: #4f7cff;
-  --accent-warm: #ffd166;
+  --black: #060606;
+  --white: #f4f4f1;
+  --gray-1: #c7c7c2;
+  --gray-2: #8c8c87;
+  --gray-3: #4a4a46;
+  --line: rgba(244, 244, 241, 0.82);
+  --line-soft: rgba(244, 244, 241, 0.28);
+  --line-faint: rgba(244, 244, 241, 0.14);
+
+  --font-display: 'Oswald', 'Arial Narrow', Arial, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-body:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+  --bar-h: 34px;
   color-scheme: dark;
 }
 
@@ -21,14 +34,32 @@ body,
   margin: 0;
 }
 
+html {
+  background: var(--black);
+}
+
 body {
-  background: var(--bg);
-  color: var(--text);
-  font:
-    13px/1.5 system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--white);
+  color: var(--black);
+}
+
+a {
+  color: inherit;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+label:focus-within {
+  outline: 1px solid var(--white);
+  outline-offset: 3px;
 }

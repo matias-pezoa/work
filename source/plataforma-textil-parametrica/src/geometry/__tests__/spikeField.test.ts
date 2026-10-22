@@ -128,7 +128,12 @@ describe('buildSpikeField', () => {
       [new THREE.Vector3(-8, 3, 0), new THREE.Vector3(8, 3, 0)],
       { radius: 6, strength: 1, falloff: 'linear' },
     )
-    const res = buildSpikeField([curve], { ...base, densityMin: 0, densityMax: 1, jitter: 0 })
+    const res = buildSpikeField([curve], {
+      ...base,
+      densityMin: 0,
+      densityMax: 1,
+      jitter: 0,
+    })
     expect(res.count).toBeGreaterThan(0)
     // deberian aparecer puas cerca de ambos extremos de la linea, no solo
     // agrupadas en el medio: eso distingue una curva de un atractor punto.

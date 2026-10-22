@@ -4,6 +4,7 @@ import { useAppStore } from '../state/store'
 import type { FieldNumericKey } from '../state/store'
 import { ParamSlider } from './ParamSlider'
 import { AttractorEditor } from './AttractorEditor'
+import { useAttractorSet } from '../state/attractorSets'
 import { BaseShapeImporter } from './BaseShapeImporter'
 import { FIELD_UI_PARAMS } from '../geometry/spikeField'
 import type { SpikeFieldResult } from '../geometry/spikeField'
@@ -29,13 +30,7 @@ export function SpikeFieldPanel({ result }: SpikeFieldPanelProps) {
   const setCombine = useAppStore((s) => s.setCombine)
   const toggleAlignToField = useAppStore((s) => s.toggleAlignToField)
 
-  const attractors = useAppStore((s) => s.attractors)
-  const selectedId = useAppStore((s) => s.selectedAttractorId)
-  const addAttractor = useAppStore((s) => s.addAttractor)
-  const addAttractorCurve = useAppStore((s) => s.addAttractorCurve)
-  const selectAttractor = useAppStore((s) => s.selectAttractor)
-  const updateAttractor = useAppStore((s) => s.updateAttractor)
-  const removeAttractor = useAppStore((s) => s.removeAttractor)
+  const attractorSet = useAttractorSet('volume')
   const baseShape = useAppStore((s) => s.baseShape)
 
   const set = (key: FieldNumericKey) => (v: number) => setFieldParam(key, v)
@@ -138,16 +133,7 @@ export function SpikeFieldPanel({ result }: SpikeFieldPanelProps) {
         </label>
       </section>
 
-      <AttractorEditor
-        attractors={attractors}
-        selectedId={selectedId}
-        planeSize={editorPlaneSize}
-        onAdd={addAttractor}
-        onAddCurve={addAttractorCurve}
-        onSelect={selectAttractor}
-        onUpdate={updateAttractor}
-        onRemove={removeAttractor}
-      />
+      <AttractorEditor set={attractorSet} planeSize={editorPlaneSize} />
 
       <section>
         <h3>Exportar</h3>

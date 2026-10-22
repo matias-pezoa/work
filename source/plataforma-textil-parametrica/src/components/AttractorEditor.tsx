@@ -1,35 +1,39 @@
 /**
  * Seccion de panel para gestionar un set de atractores: botones para agregar
- * (punto o curva), lista, y sliders/waypoints del seleccionado. Sin acoplar
- * a un store en particular (recibe todo por props) para reusarse en
- * cualquier modo (Volumen, Ondas, ...).
+ * (punto o curva), lista, y sliders / forma de curva / puntos del
+ * seleccionado. Recibe el set del modo (state/attractorSets.ts) para
+ * reusarse en Volumen, Ondas y Corte laser.
  */
 import { ParamSlider } from './ParamSlider'
-import { ATTRACTOR_UI_PARAMS, FALLOFF_LABELS, MIN_CURVE_POINTS } from '../geometry/attractionField'
-import type { Attractor, AttractorPatch, FalloffType } from '../geometry/attractionField'
+import {
+  ATTRACTOR_UI_PARAMS,
+  FALLOFF_LABELS,
+  MIN_CURVE_POINTS,
+  removeCurvePoint,
+} from '../geometry/attractionField'
+import type { FalloffType } from '../geometry/attractionField'
+import type { AttractorSet } from '../state/attractorSets'
 
 interface AttractorEditorProps {
-  attractors: readonly Attractor[]
-  selectedId: string | null
+  set: AttractorSet
   /** Lado del panel: se usa para dispersar la posicion inicial de uno nuevo. */
   planeSize: number
-  onAdd: (position: [number, number, number]) => void
-  onAddCurve: (points: readonly [number, number, number][]) => void
-  onSelect: (id: string) => void
-  onUpdate: (id: string, patch: AttractorPatch) => void
-  onRemove: (id: string) => void
+  /** Texto de ayuda propio del modo (por defecto, el del viewport 3D). */
+  hint?: string
 }
 
+const DEFAULT_HINT =
+  'Clic en un punto para seleccionarlo y arrastrarlo con el gizmo (su altura tambien ' +
+  'influye en el campo). Clic derecho en el plano: agrega un punto a la curva ' +
+  'seleccionada, o un atractor nuevo si no hay curva seleccionada. Supr borra el punto ' +
+  'seleccionado. Esfera = vertice suave (Bezier), cubo = esquina.'
+
 export function AttractorEditor({
-  attractors,
-  selectedId,
+  set,
   planeSize,
-  onAdd,
-  onAddCurve,
-  onSelect,
-  onUpdate,
-  onRemove,
+  hint = DEFAULT_HINT,
 }: AttractorEditorProps) {
+  const { attractors, selectedId, selectedPointIndex } = set
   const selected = attractors.find((a) => a.id === selectedId)
 
   // posicion aleatoria dentro del panel: si se agregan varios de una, no
@@ -44,13 +48,13 @@ export function AttractorEditor({
     ]
   }
 
-  const addRandom = () => onAdd(randomPoint())
+  const addRandom = () => set.add(randomPoint())
 
   const addCurve = () => {
     const half = planeSize * 0.3
     const y = 3 + Math.random() * 2
     const z = (Math.random() * 2 - 1) * half
-    onAddCurve([
+    set.addCurve([
       [-half, y, z],
       [half, y, z],
     ])
@@ -63,23 +67,43 @@ export function AttractorEditor({
     // extiende la curva en la misma direccion del ultimo tramo; el usuario la
     // reubica despues arrastrando el gizmo.
     const extended = last.clone().add(last.clone().sub(prev))
-    onUpdate(selected.id, { points: [...selected.points, extended] })
+    set.update(selected.id, { points: [...selected.points, extended] })
+    set.select(selected.id, selected.points.length)
   }
 
-  const removeWaypoint = () => {
+  const removeActivePoint = () => {
     if (!selected || selected.kind !== 'curve') return
-    if (selected.points.length <= MIN_CURVE_POINTS) return
-    onUpdate(selected.id, { points: selected.points.slice(0, -1) })
+    const index = selectedPointIndex ?? selected.points.length - 1
+    const patch = removeCurvePoint(selected, index)
+    if (!patch) return
+    set.update(selected.id, patch)
+    set.select(selected.id, Math.max(0, index - 1))
+  }
+
+  const curve = selected?.kind === 'curve' ? selected : null
+  const allCorner = curve ? curve.smooth.every((s) => !s) : false
+  const allSmooth = curve ? curve.smooth.every((s) => s) : false
+  const activePoint =
+    curve && selectedPointIndex !== null && selectedPointIndex < curve.points.length
+      ? selectedPointIndex
+      : null
+
+  const setAllSmooth = (value: boolean) => {
+    if (!curve) return
+    set.update(curve.id, { smooth: curve.smooth.map(() => value) })
+  }
+
+  const setPointSmooth = (value: boolean) => {
+    if (!curve || activePoint === null) return
+    set.update(curve.id, {
+      smooth: curve.smooth.map((s, i) => (i === activePoint ? value : s)),
+    })
   }
 
   return (
     <section>
       <h3>Atractores ({attractors.length})</h3>
-      <p className="hint">
-        Clic en una esfera roja para seleccionarla y arrastrarla con el gizmo (su altura
-        tambien influye en el campo). Una curva es una linea recta entre sus puntos de
-        control — agregar puntos la hace mas curva.
-      </p>
+      <p className="hint">{hint}</p>
       <div className="seg">
         <button type="button" onClick={addRandom}>
           + Agregar punto
@@ -91,11 +115,13 @@ export function AttractorEditor({
       <ul className="attractor-list">
         {attractors.map((a) => (
           <li key={a.id} className={a.id === selectedId ? 'active' : ''}>
-            <button type="button" className="link" onClick={() => onSelect(a.id)}>
-              {a.kind === 'curve' ? `curva (${a.points.length} pts)` : 'punto'} · r
-              {a.radius.toFixed(1)} · {FALLOFF_LABELS[a.falloff]}
+            <button type="button" className="link" onClick={() => set.select(a.id, 0)}>
+              {a.kind === 'curve'
+                ? `${a.smooth.some((s) => s) ? 'curva' : 'recta'} (${a.points.length} pts)`
+                : 'punto'}{' '}
+              · r{a.radius.toFixed(1)} · {FALLOFF_LABELS[a.falloff]}
             </button>
-            <button type="button" className="del" onClick={() => onRemove(a.id)}>
+            <button type="button" className="del" onClick={() => set.remove(a.id)}>
               ✕
             </button>
           </li>
@@ -104,7 +130,7 @@ export function AttractorEditor({
       {selected && (
         <div className="sub">
           <h4>
-            {selected.kind === 'curve' ? 'Curva' : 'Atractor'} {selected.id.slice(-5)}
+            {selected.kind === 'curve' ? 'Linea' : 'Atractor'} {selected.id.slice(-5)}
           </h4>
           {ATTRACTOR_UI_PARAMS.map((p) => (
             <ParamSlider
@@ -112,7 +138,7 @@ export function AttractorEditor({
               param={p}
               value={p.key === 'radius' ? selected.radius : selected.strength}
               onChange={(v) =>
-                onUpdate(
+                set.update(
                   selected.id,
                   p.key === 'radius' ? { radius: v } : { strength: v },
                 )
@@ -126,25 +152,71 @@ export function AttractorEditor({
                 key={f}
                 type="button"
                 className={selected.falloff === f ? 'active' : ''}
-                onClick={() => onUpdate(selected.id, { falloff: f })}
+                onClick={() => set.update(selected.id, { falloff: f })}
               >
                 {FALLOFF_LABELS[f]}
               </button>
             ))}
           </div>
-          {selected.kind === 'curve' && (
+          {curve && (
             <>
-              <label className="param-label">Puntos de control ({selected.points.length})</label>
+              <label className="param-label">Forma de la linea</label>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={allCorner ? 'active' : ''}
+                  onClick={() => setAllSmooth(false)}
+                >
+                  Recta
+                </button>
+                <button
+                  type="button"
+                  className={allSmooth ? 'active' : ''}
+                  onClick={() => setAllSmooth(true)}
+                >
+                  Curva (Bezier)
+                </button>
+              </div>
+              <label className="param-label">
+                {activePoint !== null
+                  ? `Vertice ${activePoint + 1} de ${curve.points.length}`
+                  : 'Selecciona un punto para editar su vertice'}
+              </label>
+              <div className="seg">
+                <button
+                  type="button"
+                  disabled={activePoint === null}
+                  className={
+                    activePoint !== null && !curve.smooth[activePoint] ? 'active' : ''
+                  }
+                  onClick={() => setPointSmooth(false)}
+                >
+                  Esquina
+                </button>
+                <button
+                  type="button"
+                  disabled={activePoint === null}
+                  className={
+                    activePoint !== null && curve.smooth[activePoint] ? 'active' : ''
+                  }
+                  onClick={() => setPointSmooth(true)}
+                >
+                  Suave
+                </button>
+              </div>
+              <label className="param-label">
+                Puntos de control ({curve.points.length})
+              </label>
               <div className="seg">
                 <button type="button" onClick={addWaypoint}>
                   + Agregar punto
                 </button>
                 <button
                   type="button"
-                  onClick={removeWaypoint}
-                  disabled={selected.points.length <= MIN_CURVE_POINTS}
+                  onClick={removeActivePoint}
+                  disabled={curve.points.length <= MIN_CURVE_POINTS}
                 >
-                  Quitar ultimo
+                  {activePoint !== null ? 'Quitar seleccionado' : 'Quitar ultimo'}
                 </button>
               </div>
             </>

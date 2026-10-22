@@ -18,13 +18,17 @@ export function Viewport({ children }: ViewportProps) {
       camera={{ position: [14, 12, 18], fov: 45, near: 0.1, far: 500 }}
       gl={{ antialias: true }}
     >
-      <color attach="background" args={['#141518']} />
-      <hemisphereLight args={['#dfe7ff', '#20222a', 0.55]} />
+      <color attach="background" args={['#060606']} />
+      <hemisphereLight args={['#f4f4f1', '#1a1a18', 0.55]} />
       <directionalLight
         position={[10, 18, 8]}
         intensity={1.6}
         castShadow
         shadow-mapSize={[2048, 2048]}
+        // sin bias las caras que miran lejos de la luz (discos de base) se
+        // auto-sombrean en franjas ("shadow acne")
+        shadow-bias={-0.0005}
+        shadow-normalBias={0.04}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}
@@ -36,10 +40,10 @@ export function Viewport({ children }: ViewportProps) {
         args={[60, 60]}
         cellSize={1}
         cellThickness={0.6}
-        cellColor="#2c2f38"
+        cellColor="#1f1f1d"
         sectionSize={10}
         sectionThickness={1.1}
-        sectionColor="#3d5a80"
+        sectionColor="#4a4a46"
         fadeDistance={90}
         fadeStrength={1.5}
         infiniteGrid

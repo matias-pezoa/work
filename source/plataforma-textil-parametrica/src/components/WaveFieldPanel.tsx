@@ -4,6 +4,7 @@ import { useAppStore } from '../state/store'
 import type { WaveNumericKey } from '../state/store'
 import { ParamSlider } from './ParamSlider'
 import { AttractorEditor } from './AttractorEditor'
+import { useAttractorSet } from '../state/attractorSets'
 import { BaseShapeImporter } from './BaseShapeImporter'
 import {
   WAVE_UI_PARAMS,
@@ -24,13 +25,7 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
   const setWaveParam = useAppStore((s) => s.setWaveParam)
   const setWaveCombine = useAppStore((s) => s.setWaveCombine)
 
-  const attractors = useAppStore((s) => s.waveAttractors)
-  const selectedId = useAppStore((s) => s.selectedWaveAttractorId)
-  const addAttractor = useAppStore((s) => s.addWaveAttractor)
-  const addAttractorCurve = useAppStore((s) => s.addWaveAttractorCurve)
-  const selectAttractor = useAppStore((s) => s.selectWaveAttractor)
-  const updateAttractor = useAppStore((s) => s.updateWaveAttractor)
-  const removeAttractor = useAppStore((s) => s.removeWaveAttractor)
+  const attractorSet = useAttractorSet('wave')
   const baseShape = useAppStore((s) => s.baseShape)
 
   const set = (key: WaveNumericKey) => (v: number) => setWaveParam(key, v)
@@ -48,18 +43,17 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
       <section>
         <h3>Factibilidad de impresion (FDM)</h3>
         <p className="hint">
-          Cada costilla es una pieza solida INDEPENDIENTE (un corte/contour, no un
-          calado CNC): nace en y = 0 y no hay ninguna plancha de base que las una —
-          la base es la tela que ya esta puesta en la cama de impresion. Espesor de
-          costilla minimo {MIN_RIB_THICKNESS_MM}mm (se recorta si no entra en la
-          separacion pedida, se avisa abajo); separacion minima entre ejes{' '}
-          {MIN_SPACING_MM}mm; longitud de onda minima {MIN_WAVELENGTH_MM}mm. Al no
-          tener voladizo real (son paredes casi verticales, el perfil solo sube y
-          baja dentro de la pared) no hace falta recortar la amplitud por angulo —
-          el riesgo en este modo es la esbeltez (costillas muy altas y finas pueden
-          vibrar o desprenderse), reportada abajo. Con "Altura minima (valle)" en 0,
-          las zonas sin influencia de ningun atractor quedan directamente vacias (sin
-          material) en vez de mostrar una costilla plana.
+          Cada costilla es una pieza solida INDEPENDIENTE (un corte/contour, no un calado
+          CNC): nace en y = 0 y no hay ninguna plancha de base que las una — la base es la
+          tela que ya esta puesta en la cama de impresion. Espesor de costilla minimo{' '}
+          {MIN_RIB_THICKNESS_MM}mm (se recorta si no entra en la separacion pedida, se
+          avisa abajo); separacion minima entre ejes {MIN_SPACING_MM}mm; longitud de onda
+          minima {MIN_WAVELENGTH_MM}mm. Al no tener voladizo real (son paredes casi
+          verticales, el perfil solo sube y baja dentro de la pared) no hace falta
+          recortar la amplitud por angulo — el riesgo en este modo es la esbeltez
+          (costillas muy altas y finas pueden vibrar o desprenderse), reportada abajo. Con
+          "Altura minima (valle)" en 0, las zonas sin influencia de ningun atractor quedan
+          directamente vacias (sin material) en vez de mostrar una costilla plana.
         </p>
       </section>
 
@@ -82,8 +76,8 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
           />
         ))}
         <p className="hint">
-          "Muestras por onda" baja (2-4) da un perfil angular, de segmentos rectos
-          bien marcados; alta (12+) da una curva suave por costilla.
+          "Muestras por onda" baja (2-4) da un perfil angular, de segmentos rectos bien
+          marcados; alta (12+) da una curva suave por costilla.
         </p>
         <div className="seg">
           <button
@@ -103,16 +97,7 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
         </div>
       </section>
 
-      <AttractorEditor
-        attractors={attractors}
-        selectedId={selectedId}
-        planeSize={editorPlaneSize}
-        onAdd={addAttractor}
-        onAddCurve={addAttractorCurve}
-        onSelect={selectAttractor}
-        onUpdate={updateAttractor}
-        onRemove={removeAttractor}
-      />
+      <AttractorEditor set={attractorSet} planeSize={editorPlaneSize} />
 
       <section>
         <h3>Exportar</h3>
@@ -136,7 +121,8 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
           <div>
             <dt>Altura maxima</dt>
             <dd>
-              {result.maxHeightMm.toFixed(1)} mm — esbeltez {result.maxAspectRatio.toFixed(1)}:1
+              {result.maxHeightMm.toFixed(1)} mm — esbeltez{' '}
+              {result.maxAspectRatio.toFixed(1)}:1
               {result.maxAspectRatio > 15 ? ' (alta, cuidado al imprimir)' : ''}
             </dd>
           </div>

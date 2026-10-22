@@ -13,6 +13,7 @@
 import * as THREE from 'three'
 import { Edges } from '@react-three/drei'
 import { useAppStore } from '../state/store'
+import { useAttractorSet } from '../state/attractorSets'
 import { AttractorGizmos } from './AttractorGizmos'
 import { BaseShapeGround } from './BaseShapeGround'
 
@@ -23,10 +24,7 @@ interface WaveFieldSceneProps {
 
 export function WaveFieldScene({ geometry, planeSize }: WaveFieldSceneProps) {
   const baseShape = useAppStore((s) => s.baseShape)
-  const attractors = useAppStore((s) => s.waveAttractors)
-  const selectedId = useAppStore((s) => s.selectedWaveAttractorId)
-  const selectAttractor = useAppStore((s) => s.selectWaveAttractor)
-  const updateAttractor = useAppStore((s) => s.updateWaveAttractor)
+  const attractorSet = useAttractorSet('wave')
 
   return (
     <group>
@@ -36,22 +34,17 @@ export function WaveFieldScene({ geometry, planeSize }: WaveFieldSceneProps) {
       {hasVerts(geometry) && (
         <mesh geometry={geometry} receiveShadow>
           <meshStandardMaterial
-            color="#dcd4c2"
+            color="#d6d6d1"
             roughness={0.9}
             metalness={0}
             flatShading
             side={THREE.DoubleSide}
           />
-          <Edges threshold={6} color="#8a7a5c" />
+          <Edges threshold={6} color="#4a4a46" />
         </mesh>
       )}
 
-      <AttractorGizmos
-        attractors={attractors}
-        selectedId={selectedId}
-        onSelect={selectAttractor}
-        onUpdate={updateAttractor}
-      />
+      <AttractorGizmos set={attractorSet} />
     </group>
   )
 }

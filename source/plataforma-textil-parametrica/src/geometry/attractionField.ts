@@ -5,16 +5,17 @@
  * ser de dos formas:
  *   - PUNTO: la influencia decae desde un unico punto 3D (radial, como una
  *     piedra tirada al agua).
- *   - CURVA: la influencia decae desde la LINEA POLIGONAL que conectan sus
- *     puntos de control en orden (como una piedra... pero una zanja: decae
- *     desde el punto mas cercano de esa linea, no desde un solo centro). Sirve
- *     para atraer a lo largo de una costura, un pliegue o cualquier trazo,
- *     no solo un punto. Se usan segmentos RECTOS entre puntos de control (sin
- *     suavizado tipo spline) a proposito: asi lo que se ve en el viewport
- *     (la linea entre los gizmos arrastrables) es EXACTAMENTE la geometria
- *     que decide la distancia — agregar mas puntos de control es lo que
- *     suaviza la curva, no una interpolacion oculta que podria no coincidir
- *     con lo que el usuario arrastra.
+ *   - CURVA: la influencia decae desde la LINEA que pasa por sus puntos de
+ *     control en orden (como una piedra... pero una zanja: decae desde el
+ *     punto mas cercano de esa linea, no desde un solo centro). Sirve para
+ *     atraer a lo largo de una costura, un pliegue o cualquier trazo.
+ *     Cada punto de control es ESQUINA o SUAVE (`smooth[i]`). La linea es una
+ *     curva Bezier cubica por tramos que PASA por los puntos de control; en un
+ *     punto suave los manejadores salen automaticos de la tangente de sus
+ *     vecinos (Catmull-Rom), en una esquina se colapsan sobre el punto. Todo
+ *     esquina = la poligonal recta de siempre. La curva se teselada UNA vez
+ *     (`curvePath`) y esa misma polilinea es la que se dibuja en el viewport y
+ *     la que decide la distancia: lo que se ve es exactamente lo que atrae.
  *
  * Dado un punto en el espacio y una lista de atractores, `sampleField`
  * devuelve un valor de campo combinado en [0,1] y una direccion (gradiente
@@ -53,6 +54,8 @@ export interface CurveAttractor extends AttractorCommon {
   kind: 'curve'
   /** Puntos de control, en orden, en unidades de Three.js. Minimo 2. */
   points: THREE.Vector3[]
+  /** Por punto de control: true = vertice suave (Bezier), false = esquina. */
+  smooth: boolean[]
 }
 
 export type Attractor = PointAttractor | CurveAttractor
@@ -73,6 +76,18 @@ export interface AttractorPatch {
   falloff?: FalloffType
   position?: THREE.Vector3
   points?: THREE.Vector3[]
+  /** Solo curvas: tipo de vertice por punto (se alinea al largo de `points`). */
+  smooth?: boolean[]
+}
+
+/**
+ * Ajusta `smooth` al largo de la curva: recorta lo que sobra y completa lo
+ * que falta repitiendo el ultimo valor (un punto nuevo hereda el tipo de su
+ * vecino), o `true` si la lista esta vacia.
+ */
+function alignSmooth(smooth: readonly boolean[], length: number): boolean[] {
+  const fill = smooth.length > 0 ? smooth[smooth.length - 1] : true
+  return Array.from({ length }, (_, i) => smooth[i] ?? fill)
 }
 
 /** Aplica un `AttractorPatch`, clonando los vectores para no aliasear el estado. */
@@ -89,10 +104,144 @@ export function applyAttractorPatch(a: Attractor, patch: AttractorPatch): Attrac
       position: patch.position ? patch.position.clone() : a.position,
     }
   }
+  const points = patch.points ? patch.points.map((p) => p.clone()) : a.points
   return {
     ...a,
     ...common,
-    points: patch.points ? patch.points.map((p) => p.clone()) : a.points,
+    points,
+    smooth: alignSmooth(patch.smooth ?? a.smooth, points.length),
+  }
+}
+
+// ------------------------------------------------------------ curva Bezier
+
+/** Muestras por tramo curvo al teselar (un tramo recto usa solo sus extremos). */
+const SAMPLES_PER_SEGMENT = 16
+
+/**
+ * Tramos Bezier cubicos [p0, c1, c2, p1] que pasan por los puntos de control.
+ * Tangente de un punto suave = (siguiente - anterior)/2 (Catmull-Rom; en los
+ * extremos, el unico vecino); los manejadores van a 1/3 de esa tangente. En
+ * una esquina la tangente es 0: los manejadores caen sobre el punto, asi que
+ * un tramo entre dos esquinas es exactamente recto.
+ */
+export function bezierSegments(
+  points: readonly THREE.Vector3[],
+  smooth: readonly boolean[],
+): [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3][] {
+  const n = points.length
+  const tangent = (i: number) => {
+    if (!smooth[i] || n < 2) return new THREE.Vector3()
+    const prev = points[Math.max(0, i - 1)]
+    const next = points[Math.min(n - 1, i + 1)]
+    const scale = i === 0 || i === n - 1 ? 1 : 0.5
+    return next.clone().sub(prev).multiplyScalar(scale)
+  }
+  const tangents = points.map((_, i) => tangent(i))
+  const segs: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3][] = []
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i]
+    const p1 = points[i + 1]
+    segs.push([
+      p0,
+      p0.clone().addScaledVector(tangents[i], 1 / 3),
+      p1.clone().addScaledVector(tangents[i + 1], -1 / 3),
+      p1,
+    ])
+  }
+  return segs
+}
+
+const _pathCache = new WeakMap<CurveAttractor, THREE.Vector3[]>()
+
+/**
+ * Polilinea que representa la curva (teselada si tiene vertices suaves).
+ * Cacheada por objeto: el estado es inmutable (cada edicion crea un atractor
+ * nuevo), asi que una curva se tesela una sola vez por version.
+ */
+export function curvePath(a: CurveAttractor): THREE.Vector3[] {
+  const cached = _pathCache.get(a)
+  if (cached) return cached
+  const segs = bezierSegments(a.points, a.smooth)
+  const out: THREE.Vector3[] = a.points.length ? [a.points[0].clone()] : []
+  segs.forEach(([p0, c1, c2, p1], i) => {
+    const straight = !a.smooth[i] && !a.smooth[i + 1]
+    const steps = straight ? 1 : SAMPLES_PER_SEGMENT
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps
+      const u = 1 - t
+      out.push(
+        new THREE.Vector3()
+          .addScaledVector(p0, u * u * u)
+          .addScaledVector(c1, 3 * u * u * t)
+          .addScaledVector(c2, 3 * u * t * t)
+          .addScaledVector(p1, t * t * t),
+      )
+    }
+  })
+  _pathCache.set(a, out)
+  return out
+}
+
+/**
+ * Parche que inserta un punto de control en la curva, cerca de `point`
+ * (se razona en el plano XZ). Si `point` cae junto a un extremo, extiende la
+ * curva por ese lado; si no, lo inserta en el tramo mas cercano. La altura (y)
+ * se interpola de los vecinos, para no "pinchar" la curva en 3D. El nuevo
+ * punto hereda el tipo de vertice de su vecino.
+ */
+export function insertCurvePoint(
+  a: CurveAttractor,
+  point: THREE.Vector3,
+): { patch: AttractorPatch; index: number } {
+  const pts = a.points
+  let best = { d: Infinity, seg: 0, t: 0 }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const ax = pts[i].x
+    const az = pts[i].z
+    const abx = pts[i + 1].x - ax
+    const abz = pts[i + 1].z - az
+    const lenSq = abx * abx + abz * abz
+    const t =
+      lenSq < 1e-12
+        ? 0
+        : clamp(((point.x - ax) * abx + (point.z - az) * abz) / lenSq, 0, 1)
+    const d = Math.hypot(point.x - (ax + abx * t), point.z - (az + abz * t))
+    if (d < best.d) best = { d, seg: i, t }
+  }
+  const last = pts.length - 1
+  let index: number
+  let y: number
+  if (best.seg === 0 && best.t === 0) {
+    index = 0
+    y = pts[0].y
+  } else if (best.seg === last - 1 && best.t === 1) {
+    index = pts.length
+    y = pts[last].y
+  } else {
+    index = best.seg + 1
+    y = pts[best.seg].y + (pts[best.seg + 1].y - pts[best.seg].y) * best.t
+  }
+  const neighbor = a.smooth[Math.min(index, last)] ?? true
+  const newPoint = new THREE.Vector3(point.x, y, point.z)
+  return {
+    index,
+    patch: {
+      points: [...pts.slice(0, index), newPoint, ...pts.slice(index)],
+      smooth: [...a.smooth.slice(0, index), neighbor, ...a.smooth.slice(index)],
+    },
+  }
+}
+
+/** Parche que quita el punto `index` (null si la curva quedaria bajo el minimo). */
+export function removeCurvePoint(
+  a: CurveAttractor,
+  index: number,
+): AttractorPatch | null {
+  if (a.points.length <= MIN_CURVE_POINTS) return null
+  return {
+    points: a.points.filter((_, i) => i !== index),
+    smooth: a.smooth.filter((_, i) => i !== index),
   }
 }
 
@@ -168,7 +317,7 @@ export function closestPointOnAttractor(
   out: THREE.Vector3 = new THREE.Vector3(),
 ): THREE.Vector3 {
   if (a.kind === 'point') return out.copy(a.position)
-  const pts = a.points
+  const pts = curvePath(a)
   if (pts.length <= 1) return out.copy(pts[0] ?? point)
   let bestDistSq = Infinity
   for (let i = 0; i < pts.length - 1; i++) {
@@ -207,7 +356,7 @@ function distanceToSegment2D(
  */
 export function closestDistance2D(x: number, z: number, a: Attractor): number {
   if (a.kind === 'point') return Math.hypot(x - a.position.x, z - a.position.z)
-  const pts = a.points
+  const pts = curvePath(a)
   if (pts.length === 0) return Infinity
   if (pts.length === 1) return Math.hypot(x - pts[0].x, z - pts[0].z)
   let best = Infinity
@@ -302,6 +451,8 @@ export function createCurveAttractor(
     id: nextAttractorId(),
     kind: 'curve',
     points: points.map((p) => p.clone()),
+    // por defecto recta (todas esquinas): la forma mas predecible.
+    smooth: alignSmooth(overrides.smooth ?? [false], points.length),
     radius: overrides.radius ?? 6,
     strength: overrides.strength ?? 1,
     falloff: overrides.falloff ?? 'gaussian',

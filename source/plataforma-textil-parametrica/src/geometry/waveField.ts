@@ -201,7 +201,9 @@ export function buildWaveField(
   boundary?: Boundary | null,
 ): WaveFieldResult {
   const spacing = mmToThree(Math.max(MIN_SPACING_MM, params.spacingMm))
-  const requestedThickness = mmToThree(Math.max(MIN_RIB_THICKNESS_MM, params.ribThicknessMm))
+  const requestedThickness = mmToThree(
+    Math.max(MIN_RIB_THICKNESS_MM, params.ribThicknessMm),
+  )
   const gap = mmToThree(RIB_GAP_MM)
   const thickness = Math.max(
     mmToThree(MIN_RIB_THICKNESS_MM),
@@ -221,7 +223,11 @@ export function buildWaveField(
   const effectiveSpacing = ribCount > 1 ? width / (ribCount - 1) : 0
 
   const sampleStep = wavelength / facets
-  const sampleCount = clamp(height > 0 ? Math.round(height / sampleStep) : 1, 4, MAX_SAMPLES_PER_RIB)
+  const sampleCount = clamp(
+    height > 0 ? Math.round(height / sampleStep) : 1,
+    4,
+    MAX_SAMPLES_PER_RIB,
+  )
 
   const heightAt = (x: number, z: number): number =>
     heightFloor + rippleHeight(x, z, attractors, params.combine, wavelength) * amplitude
@@ -234,7 +240,8 @@ export function buildWaveField(
   let maxHeight = 0
 
   for (let i = 0; i < ribCount; i++) {
-    const x = ribCount > 1 ? domain.minX + i * effectiveSpacing : (domain.minX + domain.maxX) / 2
+    const x =
+      ribCount > 1 ? domain.minX + i * effectiveSpacing : (domain.minX + domain.maxX) / 2
     for (const run of insideRuns(hasMaterial, domain.minZ, height, x, sampleCount)) {
       const zs: number[] = []
       const hs: number[] = []

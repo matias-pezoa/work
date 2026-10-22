@@ -15,9 +15,9 @@
 | 0 | Setup del proyecto | Repo corriendo, viewport 3D con cubo de prueba | ✅ |
 | 1 | Motor de volumen parametrico | Perfil 2D barrido por una curva, UI de params, export STL | ✅ |
 | 2 | Mapas de atraccion + instanciado dirigido por campo | Escamas/plumas sobre una superficie con densidad no uniforme | ✅ |
-| 3 | Modulo de geometria auxetica | Celdas unitarias parametrizadas, teseladas sobre un panel 2D | pendiente |
+| 3 | Modulo de geometria auxetica | Celdas unitarias parametrizadas, teseladas sobre un panel 2D | parcial (kirigami de cuadrados rotantes en modo Corte laser; reentrante/quiral pendientes) |
 | 4 | Pipeline imagen → vector / imagen → dato | Subir imagen → contornos o mapa de atraccion por luminancia | pendiente |
-| 5 | Kerf + exportacion laser | Offset de paths por kerf/material, export SVG/DXF con capas | pendiente |
+| 5 | Kerf + exportacion laser | Offset de paths por kerf/material, export SVG/DXF con capas | ✅ basico (offset propio en inglete + presets de material; Clipper2 y nesting pendientes) |
 | 6 | Integracion, guardar/cargar proyecto | Flujo completo cuerpo → atractores → geometria → export | pendiente |
 | 7 | Pulido, performance, documentacion | App usable en clase/taller sin supervision | pendiente |
 

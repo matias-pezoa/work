@@ -45,7 +45,7 @@ export function BaseShapeGround({ planeSize, baseShape, y = 0 }: BaseShapeGround
         receiveShadow
       >
         <meshStandardMaterial
-          color="#d8cdbf"
+          color="#2a2a27"
           roughness={0.95}
           metalness={0}
           side={THREE.DoubleSide}
@@ -58,10 +58,10 @@ export function BaseShapeGround({ planeSize, baseShape, y = 0 }: BaseShapeGround
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} receiveShadow>
         <planeGeometry args={[planeSize, planeSize, 1, 1]} />
-        <meshStandardMaterial color="#d8cdbf" roughness={0.95} metalness={0} />
+        <meshStandardMaterial color="#2a2a27" roughness={0.95} metalness={0} />
       </mesh>
       <gridHelper
-        args={[planeSize, Math.max(2, Math.round(planeSize / 2)), '#b9ab97', '#c7bca6']}
+        args={[planeSize, Math.max(2, Math.round(planeSize / 2)), '#4a4a46', '#383835']}
         position={[0, y + 0.002, 0]}
       />
     </group>

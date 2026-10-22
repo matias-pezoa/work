@@ -16,7 +16,7 @@ Herramienta web para diseno de moda experimental. Tres modos, dos fabricaciones:
    factibilidad que Volumen, pero geometria y modulo separados. Export STL.
 3. **Corte laser (2D):** se trabaja SOLO desde el vector. Cortes parametricos con
    distintas familias de geometria (huella de las puas, retícula auxetica,
-   escamas), export SVG/DXF con compensacion de kerf. (En preparacion.)
+   escamas, calado por campo), export SVG/DXF con compensacion de kerf.
 
 Ademas (roadmap): extraer datos de imagenes de referencia (contornos, luminancia
 como campo de atraccion) y libreria de materiales para el kerf.
@@ -119,7 +119,53 @@ src/
   atractores, imprimible por construccion).
 - Modo Ondas: COMPLETO (panel corrugado facetado desde el plano, dirigido por
   atractores, imprimible por construccion).
-- Modo Corte laser: PENDIENTE (solo un placeholder en la UI).
+- Modo Corte laser: COMPLETO (cortes y calados 2D dirigidos por atractores,
+  fabricables por construccion: puente minimo, margen, kerf).
+
+### Modo Corte laser — COMPLETO
+2D puro, en mm, plano XZ con el mismo origen que la base de los modos 3D.
+
+- `geometry/laserCut.ts`: `buildLaserCut(attractors, params, input)` ->
+  `LaserCutResult` (`paths` por capa `calado`/`corte`/`contorno`, ya
+  compensados por kerf y ordenados con el contorno AL FINAL, + stats).
+  Familias: `perforation` (grilla hexagonal, poligono de n lados alargado y
+  orientado por el campo), `kirigami` (cuadrados rotantes: cortes alternados
+  H/V en grilla cuadrada, el campo achica la bisagra), `scales` (arcos
+  abiertos en filas alternadas, punta lejos del atractor), `footprint` (un
+  calado en la base de cada pua de `buildSpikeField`; sin base importada usa
+  el panel cuadrado de Volumen).
+  Restricciones por construccion (no aflojarlas sin discutirlo):
+  - Puente: el tamano maximo se deriva de la grilla — `rMax = (paso - puente)/2`
+    en la hexagonal (los 6 vecinos a `paso`), bisagra >= `puente + kerf/2` en
+    kirigami, `(vecino - puente - kerf)/2` en escamas. Huella: chequeo por pares.
+  - Margen: `fits()` exige cada vertice dentro del contorno y a >= margen de
+    cualquier borde (externo o agujero). `margen >= puente + kerf/2`.
+  - `MIN_FEATURE_MM`, `MIN_BRIDGE_MM`, `MAX_ELEMENTS` (tope anti-congelamiento).
+  - Kerf: calados `offsetPolygon(-kerf/2)`, contorno `+kerf/2`, cortes
+    abiertos acortados kerf/2 por extremo. `openAreaMm2` es el area DISENADA.
+- `geometry/polygon.ts` gano `offsetPolygon` (inglete, offsets chicos — no
+  resuelve colapsos ni auto-intersecciones; para eso Clipper2),
+  `distanceToSegment`, `distanceToBoundaryEdges`, `polylineLength`,
+  `rectBoundary`.
+- `io/exportLaser.ts`: `laserToSvg` (mm, `<g>` por capa, azul/verde/rojo) y
+  `laserToDxf` (R12 AC1009, POLYLINE+VERTEX, capas CALADO/CORTE/CONTORNO,
+  `$INSUNITS`=mm, Z invertida porque DXF tiene Y hacia arriba). Verificado una
+  vez con `dxf-parser` (no es dependencia del proyecto). `io/download.ts`
+  compartido con exportSTL.
+- Estado: `laser`, `laserAttractors` (propios, SIEMPRE en y = 0: las acciones
+  del store aplanan cualquier posicion), `selectedLaserAttractorId`;
+  `setLaserMaterial` aplica kerf/puente del preset (`LASER_MATERIALS`).
+- UI: `LaserView` (SVG; atractores son circulos SVG arrastrables — aca no
+  aplica el problema del gizmo de TransformControls), `LaserPanel`.
+  `AttractorEditor` se reusa con `hint` propio. El calculo vive en
+  `App.tsx` (`useLaserCut`) y solo corre con el modo activo.
+- Tests: `laserCut.test.ts` (offset, distancias, por familia: genera cortes,
+  sin atractores no corta, puente minimo real entre pares, margen al borde,
+  determinismo, contorno al final; kerf achica calados/agranda contorno;
+  agujero de la base respetado; huella: margen y puente), y
+  `io/__tests__/exportLaser.test.ts` (estructura SVG/DXF).
+- Pendiente: Clipper2 para kerf robusto, reticula reentrante / quiral (guia
+  Fase 3), nesting, estimacion de tiempo de corte por material.
 
 ### Setup — COMPLETO
 - Vite React-TS, estructura de carpetas, tsconfig estricto, prettier, vitest.
@@ -269,8 +315,40 @@ ponerlo) sino eliminar el gesto: agregar atractores es SOLO el boton
 despues arrastrando el gizmo). Si se reintroduce alguna vez un gesto de clic
 en el viewport, verificar primero que no reaparezca este problema.
 
+**Clic DERECHO si agrega** (y es seguro): `AttractorGizmos` escucha
+`onContextMenu` en un plano invisible de 400x400 en y = 0, no
+`onPointerDown`. El gizmo solo se arrastra con el boton izquierdo, asi que no
+lo dispara. Un clic derecho CON arrastre es el paneo de OrbitControls: se
+ignora si `e.delta > 4px`. En la vista 2D (LaserView) el boton derecho no
+inicia paneo ni arrastre (`e.button !== 0`).
+
+### Lineas atractoras Bezier, seleccion de punto y atajos (los tres modos)
+- `CurveAttractor.smooth: boolean[]` (uno por punto de control): suave = la
+  curva pasa por el punto con manejadores Bezier automaticos (tangente
+  Catmull-Rom, a 1/3), esquina = manejadores colapsados. Todo esquina = la
+  poligonal recta de antes; `createCurveAttractor` crea rectas por defecto
+  (tests viejos intactos), las de la UI y las iniciales nacen suaves.
+  `applyAttractorPatch` mantiene `smooth` alineado al largo de `points`.
+- `curvePath(a)` tesela (16 muestras por tramo curvo, 1 por tramo recto) y se
+  cachea en un WeakMap por objeto (el estado es inmutable). LO MISMO se
+  dibuja (gizmos 3D, LaserView) y se usa para la distancia
+  (`closestPointOnAttractor`, `closestDistance2D`): lo que se ve es lo que atrae.
+- `insertCurvePoint` (tramo mas cercano en XZ o extiende un extremo; y
+  interpolada; hereda el tipo del vecino), `removeCurvePoint` (min 2 puntos).
+- `selectedPointIndex` en el store, compartido por gizmo/vista, panel y
+  teclado; los `select*` reciben `(id, pointIndex)`.
+- `state/attractorSets.ts`: `AttractorSet` comun a los 3 modos
+  (`useAttractorSet(kind)` con `useShallow`, `attractorSetFrom(state, kind)`
+  para snapshots), `deleteSelection` (Supr/Delete/Backspace: punto de curva, o
+  el atractor entero si es punto o quedaria < 2 puntos) y `addAtPoint` (clic
+  derecho). El atajo vive en `App.tsx` (`useDeleteShortcut`) y se ignora al
+  escribir en inputs de texto/numero.
+- Marcadores: esfera/circulo = suave, cubo/cuadrado = esquina; el punto activo
+  se agranda (3D) o se rellena (2D).
+- Tests: `bezierCurve.test.ts`.
+
 ### Pendiente / notas para retomar
-- **Modo Corte laser** (siguiente): 2D puro. Familias parametricas — empezar por
+- **Modo Corte laser** (HECHO, ver arriba; nota original): 2D puro. Familias parametricas — empezar por
   la huella vectorial del campo de puas (circulo de base + circulo de punta
   proyectados, para que el corte calce con la pieza 3D si se pega por separado),
   luego reticula auxetica y escamas. Render en canvas/SVG aparte del viewport
