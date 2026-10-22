@@ -241,6 +241,80 @@ h1{
   column-gap:24px;
 }
 
+/* Pestañas desplegables (home): cada registro es una barra horizontal
+   que abre su contenido debajo. Las reglas base de .record siguen
+   sirviendo a las páginas internas. */
+.record-fold{
+  display:block;
+  padding-top:0;
+  border-top:1px solid var(--line-faint);
+}
+.record-fold:first-child{border-top:1px solid var(--line-soft)}
+.record-fold:last-child{border-bottom:1px solid var(--line-soft)}
+.record-fold .record-head{
+  position:static;
+  flex-direction:row;
+  align-items:baseline;
+  gap:24px;
+  padding:30px 0;
+  cursor:pointer;
+  list-style:none;
+  transition:padding-left .15s linear;
+}
+.record-fold .record-head::-webkit-details-marker{display:none}
+.record-fold .record-head:hover{padding-left:10px}
+.record-fold .record-index{min-width:100px}
+.record-fold .record-title{
+  font-size:clamp(20px,2.4vw,30px);
+  font-weight:400;
+  letter-spacing:.06em;
+  color:var(--white);
+}
+.record-fold .record-title::before{content:none}
+.record-count{
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+}
+/* indicador +/− dibujado con dos trazos */
+.record-toggle{
+  position:relative;
+  align-self:center;
+  margin-left:auto;
+  width:14px;
+  height:14px;
+  flex:none;
+}
+.record-toggle::before,
+.record-toggle::after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:50%;
+  width:100%;
+  height:1px;
+  background:var(--gray-1);
+  transition:transform .2s ease-out;
+}
+.record-toggle::after{transform:rotate(90deg)}
+.fold[open] .record-toggle::after{transform:rotate(0deg)}
+.record-fold .record-head:hover .record-toggle::before,
+.record-fold .record-head:hover .record-toggle::after{background:var(--white)}
+.record-fold .record-body{padding:8px 0 72px}
+
+/* apertura animada donde el navegador lo permite; si no, abre directo */
+@supports (interpolate-size:allow-keywords){
+  .fold{interpolate-size:allow-keywords}
+  .fold::details-content{
+    block-size:0;
+    overflow:clip;
+    transition:block-size .35s ease-out,content-visibility .35s allow-discrete;
+  }
+  .fold[open]::details-content{block-size:auto}
+}
+
 /* Perfil */
 .record-perfil dl{
   grid-column:1/10;
@@ -397,6 +471,11 @@ a:focus-visible{outline:1px solid var(--white);outline-offset:3px}
 
 
   .links{grid-column:1/13}
+  .record-fold{padding-top:0}
+  .record-fold .record-head{margin-bottom:0;padding:24px 0;gap:14px}
+  .record-fold .record-index{min-width:0}
+  .record-count{display:none}
+  .record-fold .record-body{padding-bottom:48px}
   .works a{grid-template-columns:32px 1fr 20px;row-gap:6px}
   .works .work-title{grid-column:2}
   .works .arrow{grid-column:3;grid-row:1}
@@ -406,6 +485,7 @@ a:focus-visible{outline:1px solid var(--white);outline-offset:3px}
 
 @media (max-width:600px){
   .record{padding-top:80px}
+  .record-fold{padding-top:0}
   .record-body{row-gap:20px}
   h1{font-size:clamp(34px,11vw,52px)}
   .frame-bar span:last-child{display:none}
