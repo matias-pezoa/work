@@ -1,7 +1,6 @@
 # VRTG
 
 Guía para **Clase 02 — Computación Avanzada**
-Magíster en Ciencias del Diseño · Universidad Adolfo Ibáñez
 
 ## Objetivo
 
@@ -113,8 +112,8 @@ sin elevar al cuadrado, o invirtiendo qué zonas brillan (`1 - brillo`).
 
 El overlay sobre el canvas (tipografía monoespaciada, JetBrains Mono) muestra:
 
-- **Autor / curso / universidad** — editables directamente en `index.html`
-  (`#hud-autor`, `#hud-curso`, `#hud-universidad`).
+- **Autor / curso** — editables directamente en `index.html`
+  (`#hud-autor`, `#hud-curso`).
 - **Nivel de audio** en dB — lectura RMS en tiempo real del micrófono
   (aproximación dBFS, no es un dB SPL calibrado).
 - **Paleta cromática** — 5 colores promediados de franjas verticales de la

@@ -2550,7 +2550,7 @@ function renderPoster(focusRecord) {
   ptext(svg, 60, 30, "MP · 2026", { "font-size": 10, "letter-spacing": 1.6, fill: P_DIM });
   ptext(svg, 880, 30, "VRTG SCENT · LÁMINA DE VECINDARIO", { "text-anchor": "end", "font-size": 10, "letter-spacing": 1.6, fill: P_DIM });
   pel("line", { x1: 60, y1: 44, x2: 880, y2: 44, stroke: "rgba(244,244,241,.26)" }, svg);
-  ptext(svg, 60, 72, "REGISTRO 001 — COMPUTACIÓN AVANZADA / MCD · UAI", { "font-size": 10, "letter-spacing": 1.9, fill: P_DIM });
+  ptext(svg, 60, 72, "REGISTRO 001 — COMPUTACIÓN AVANZADA", { "font-size": 10, "letter-spacing": 1.9, fill: P_DIM });
   ptext(svg, 880, 80, "L · 001", { "text-anchor": "end", "font-size": 11, "letter-spacing": 2, fill: P_CYAN });
 
   const nm = focusRecord.name.toUpperCase();

@@ -1,6 +1,6 @@
 # Ejercicio 02 — VRTG SCENT
 
-Computación Avanzada · Magíster en Ciencias del Diseño · Universidad Adolfo Ibáñez
+Computación Avanzada
 
 Atlas generativo de perfumes: cada fragancia de `perfume_visualization.json` se traduce en una naturaleza muerta 3D biomórfica y abstracta — un mapa morfológico de su identidad olfativa, inspirado en composiciones de objetos independientes (glossy, cromados, chenille, concreto, vidrio) ensamblados alrededor de una columna central — construida procedimentalmente a partir de sus propios datos, sin geometría decorativa ni valores inventados. Cada nota olfativa aporta su propio elemento a la composición de forma independiente; la combinación de notas de cada perfume es lo que vuelve única a cada pieza.
 
