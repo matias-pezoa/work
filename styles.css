@@ -331,6 +331,8 @@ h1{
   border-top:1px solid var(--line-faint);
 }
 .record-perfil dt:first-child{margin-top:0;border-top:none;padding-top:0}
+/* intereses dentro de perfil: la lista usa el ancho completo del bloque */
+.record-perfil dd:has(.tags){max-width:none;margin-top:4px}
 .record-perfil dd{
   margin:8px 0 0;
   font-size:17px;
