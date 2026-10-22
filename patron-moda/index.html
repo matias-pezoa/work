@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./style.css?v=4" />
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -28,22 +28,28 @@
   <main class="app-shell">
     <section class="table-area">
       <header class="project-header">
-        <span class="eyebrow">Registro 001 — Computación Avanzada / MCD UAI</span>
-        <h1>Cuerpo base</h1>
-        <p class="lead">Patrón paramétrico de moda: delantero y espalda trazados en vivo a partir de las medidas del cuerpo, exportables a DXF.</p>
+        <div>
+          <span class="eyebrow">Registro 001 — Computación Avanzada / MCD UAI</span>
+          <h1>Cuerpo base</h1>
+        </div>
+        <p class="lead">Patrón paramétrico de moda: delantero y espalda trazados en vivo a partir de las medidas del cuerpo.</p>
       </header>
 
       <div class="obs">
-        <figure class="obs-frame cutting-mat">
+        <figure class="obs-frame cutting-mat" id="cutting-mat">
           <div id="pattern-canvas"></div>
+          <div class="mat-overlay mat-overlay-top">
+            <span>Bloque 01 — sin margen de costura</span>
+            <span id="scale-readout"></span>
+          </div>
+          <div class="mat-overlay mat-overlay-bottom">
+            <div class="ruler-wrap" id="ruler-wrap"></div>
+          </div>
         </figure>
         <div class="obs-meta">
           <span class="ref" id="mode-caption"></span>
-          <span class="dim">Bloque 01 — sin margen de costura</span>
         </div>
       </div>
-
-      <div class="ruler-wrap" id="ruler-wrap"></div>
 
       <ul class="legend-strip">
         <li><svg width="26" height="10"><line x1="1" y1="5" x2="25" y2="5" stroke="var(--ink)" stroke-width="1.4"/></svg>Corte</li>
@@ -68,14 +74,21 @@
           <span>Pieza completa (espejada sobre el doblez)</span>
           <input type="checkbox" id="mirror-toggle" />
         </label>
-        <button type="button" id="export-btn">Exportar DXF</button>
+        <details class="export-menu" id="export-menu">
+          <summary>Exportar</summary>
+          <div class="export-options" role="menu">
+            <button type="button" role="menuitem" data-format="pdf"><span>PDF</span><span class="fmt-note">Impresión 1:1</span></button>
+            <button type="button" role="menuitem" data-format="png"><span>PNG</span><span class="fmt-note">Imagen 1:1 · 102 dpi</span></button>
+            <button type="button" role="menuitem" data-format="dxf"><span>DXF</span><span class="fmt-note">CAD · capas</span></button>
+          </div>
+        </details>
         <button type="button" id="reset-btn" class="secondary">Restablecer medidas</button>
         <p class="status-line" id="status-line" role="status"></p>
       </div>
 
       <footer class="archive-footer">
         <span>Matías Pezoa — Computación Avanzada 2026</span>
-        <span>DXF · capas CORTE / PINZAS / GUIAS / ETIQUETAS · 1 u = 1 cm</span>
+        <span>Exporta PDF / PNG a escala 1:1 y DXF por capas</span>
       </footer>
     </aside>
   </main>
@@ -91,6 +104,6 @@
       });
     }
   </script>
-  <script type="module" src="./script.js"></script>
+  <script type="module" src="./script.js?v=4"></script>
 </body>
 </html>

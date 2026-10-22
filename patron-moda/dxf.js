@@ -30,7 +30,7 @@ function flattenSegment(seg) {
   return pts;
 }
 
-function flattenChain(segments) {
+export function flattenChain(segments) {
   if (!segments.length) return [];
   const pts = [segments[0].p0];
   for (const seg of segments) pts.push(...flattenSegment(seg));
@@ -86,12 +86,15 @@ export function buildDxf(pieces, { gap = 10 } = {}) {
   handleCounter = 0x40;
   const entities = [];
   let cursorX = 0;
-  const maxHeight = Math.max(...pieces.map((p) => p.bounds.height));
+  // Las piezas se alinean por la línea de cintura (W.y): en el DXF la cintura
+  // de todas queda a la misma altura, `waistY`, y nada baja de y = 0.
+  const waistOf = (p) => p.points?.W?.y ?? p.bounds.minY;
+  const waistY = Math.max(...pieces.map((p) => p.bounds.maxY - waistOf(p)));
 
   for (const piece of pieces) {
     const b = piece.bounds;
     const offsetX = cursorX - b.minX;
-    const offsetY = maxHeight;
+    const offsetY = waistOf(piece) + waistY;
     cursorX += b.width + gap;
 
     const foldSegs = piece.centerLine ?? piece.outline.filter((s) => s.fold);

@@ -50,17 +50,41 @@ function neckCurve(A1, A2) {
 }
 
 // Sisa: desde el costado (U) hasta el hombro (S), en el sentido en que el
-// contorno recorre la pieza. Ambos controles se acercan a la esquina de la caja
-// de sisa (más angosta que el costado), el punto guía del "aplomo de sisa".
-function armholeCurve(U, boxCorner, S) {
-  const c1 = P(boxCorner.x, U.y * 0.6);
-  const c2 = P(boxCorner.x * 0.7 + S.x * 0.3, boxCorner.y * 0.3 + S.y * 0.7);
-  return cubic(U, c1, c2, S, { role: "sisa" });
+// contorno recorre la pieza. Dos tramos, como en el trazado clásico:
+//  1. Fondo: sale de U perpendicular a la costura de costado y sube hasta
+//     tocar la vertical del ancho de pecho/espalda (T) con tangente vertical.
+//     Como delantero y espalda salen perpendiculares a su propio costado, al
+//     coser los costados la sisa sigue sin quiebre: la "gota".
+//  2. Subida: de T al hombro, llegando perpendicular a la línea de hombro.
+// `sideNext` es el punto siguiente del costado bajo U (define su dirección).
+function armholeCurve(U, sideNext, boxCorner, S, A1) {
+  const depth = U.x - boxCorner.x; // ancho del fondo de sisa
+  const T = P(boxCorner.x, Math.max(S.y + 2, U.y - depth * 1.1));
+
+  // Normal al costado en U, hacia el interior de la pieza (x decreciente).
+  const side = normalize(sub(sideNext, U));
+  let inward = P(-side.y, side.x);
+  if (inward.x > 0) inward = scale(inward, -1);
+  const k = 0.55;
+  const bottom = cubic(U, add(U, scale(inward, depth * k)), P(T.x, T.y + (U.y - T.y) * k), T, { role: "sisa" });
+
+  // Normal a la línea de hombro en S, hacia abajo.
+  const shoulder = normalize(sub(S, A1));
+  let down = P(-shoulder.y, shoulder.x);
+  if (down.y < 0) down = scale(down, -1);
+  const rise = T.y - S.y;
+  const top = cubic(T, P(T.x, T.y - rise * 0.45), add(S, scale(down, rise * 0.35)), S, { role: "sisa" });
+  return [bottom, top];
 }
 
 // Costado cadera -> cintura.
-function hipCurve(H, W) {
-  const c = P(H.x, W.y + (H.y - W.y) * 0.3);
+// `amount` (0..1) es cuánto se abomba: 0 = costado recto (cuerda W->H),
+// 1 = control en el ancho de cadera a 30% de la bajada (curva máxima).
+function hipCurve(H, W, amount = 0.35) {
+  const y = W.y + (H.y - W.y) * 0.3;
+  const onChord = P(W.x + (H.x - W.x) * 0.3, y);
+  const corner = P(H.x, y);
+  const c = add(onChord, scale(sub(corner, onChord), amount));
   return quad(H, c, W, { role: "cadera" });
 }
 
@@ -128,18 +152,16 @@ function clampDartAxis(x0, width, waistY, topY, bottomY, sideSegs) {
  * @param {object} m medidas
  * @param {"front"|"back"} side
  */
-function buildPiece(m, side) {
+function buildPiece(m, side, backSideLength) {
   const isFront = side === "front";
   const waistLength = isFront ? m.frontWaistLength : m.backWaistLength;
-  const armholeDrop = isFront ? m.frontArmholeDrop : m.backArmholeDrop;
   const halfWidth = isFront ? m.chestWidth / 2 : m.backWidth / 2;
   const dartWidth = isFront ? m.frontWaistDartWidth : m.backWaistDartWidth;
   const dartDown = isFront ? m.frontWaistDartLength : m.backWaistDartLength;
 
-  // Pasos 1-2: rectángulo base (alto = largo de talle, ancho = busto/4) y caja de sisa.
+  // Paso 1: rectángulo base (alto = largo de talle, ancho = busto/4).
   const A = P(0, 0);
   const boxTopCorner = P(m.bust / 4, 0);
-  const boxBottomCorner = P(halfWidth, armholeDrop);
 
   // Paso 3: cuello.
   const A1 = P(m.neck / 6 + m.neckHorizontalConst, 0);
@@ -149,13 +171,52 @@ function buildPiece(m, side) {
   // Paso 4: hombro.
   const S = shoulderPoint(A1, boxTopCorner, m.shoulderDrop, m.shoulderLength);
 
-  const U = P(m.bust / 4, armholeDrop);
   // La pinza consume `dartWidth` en la cintura: el panel se traza a
   // cintura/4 + ancho de pinza para que, cosida la pinza, quede cintura/4.
   const W = P(m.waist / 4 + dartWidth, waistLength);
   const D = P(0, waistLength);
   const H = P(m.hip / 4, waistLength + m.hipHeight);
   const Hc = P(0, waistLength + m.hipHeight);
+  // Curva de cadera en % (0 = recta, 100 = máxima); ver hipCurve.
+  const hipAmount = (m.hipCurve ?? 35) / 100;
+
+  // Pinza de busto (pasos 6-7): muesca sobre el costado, centrada en la altura de busto.
+  // Su ancho (abertura sobre el costado) es la diferencia entre talle
+  // delantero y talle espalda: es el largo extra que el delantero necesita
+  // para cubrir el busto. Si el delantero no es más largo, no hay pinza.
+  // Con `bustDartManual` la profundidad se fija a mano (talles iguales por
+  // espalda curva, no por falta de busto).
+  const bustDartDepth = m.bustDartManual
+    ? m.bustDartManualDepth
+    : Math.max(0, m.frontWaistLength - m.backWaistLength);
+  const hasBustDart = bustDartDepth >= 0.1;
+  const L1 = P(m.bust / 4, m.bustHeight - bustDartDepth / 2);
+  const L2 = P(m.bust / 4, m.bustHeight + bustDartDepth / 2);
+
+  // Bajo sisa (U). Espalda: bajada de sisa de la tabla. Delantero: se ubica
+  // para que el costado, con la pinza de busto cerrada (W->L2 + L1->U), mida
+  // lo mismo que el costado de la espalda; así ambos costados se cosen parejos
+  // con cualquier profundidad de pinza. Se limita para no cruzar la pinza ni
+  // subir a la zona del hombro (en ese caso el costado no logra igualarse).
+  let U;
+  let sideMatched = true;
+  if (isFront) {
+    const lowerLeg = Math.hypot(L2.x - W.x, L2.y - W.y);
+    const wantedY = L1.y - (backSideLength - lowerLeg);
+    const minY = S.y + 6;
+    const maxY = L1.y - 0.5;
+    const y = Math.min(maxY, Math.max(minY, wantedY));
+    sideMatched = Math.abs(y - wantedY) < 1e-6;
+    U = P(m.bust / 4, y);
+  } else {
+    U = P(m.bust / 4, m.backArmholeDrop);
+  }
+  const sideLength = isFront
+    ? Math.hypot(L2.x - W.x, L2.y - W.y) + (L1.y - U.y)
+    : Math.hypot(U.x - W.x, U.y - W.y);
+
+  // Paso 2: caja de sisa, a la altura del bajo sisa.
+  const boxBottomCorner = P(halfWidth, U.y);
 
   const outline = [];
   const darts = [];
@@ -163,10 +224,7 @@ function buildPiece(m, side) {
   const points = { A, boxTopCorner, boxBottomCorner, A1, A2, S, U, W, D, H, Hc };
 
   if (isFront) {
-    // Pasos 6-7: ápice de busto y pinza lateral (muesca sobre el costado).
     const apex = P(m.bustSeparation / 2, m.bustHeight);
-    const L1 = P(m.bust / 4, m.bustHeight - m.bustDartDepth / 2);
-    const L2 = P(m.bust / 4, m.bustHeight + m.bustDartDepth / 2);
     // Paso 9: despegar la pinza del ápice real hacia el costado.
     const dartDir = normalize(sub(P(L1.x, apex.y), apex));
     const dartTip = add(apex, scale(dartDir, m.dartRelease));
@@ -176,12 +234,14 @@ function buildPiece(m, side) {
     outline.push(line(A2, D, { fold: true }));
     outline.push(line(D, Hc, { fold: true }));
     outline.push(line(Hc, H));
-    outline.push(hipCurve(H, W));
+    outline.push(hipCurve(H, W, hipAmount));
     outline.push(line(W, L2));
-    outline.push(line(L2, dartTip, { role: "pinza-busto" }));
-    outline.push(line(dartTip, L1, { role: "pinza-busto" }));
+    if (hasBustDart) {
+      outline.push(line(L2, dartTip, { role: "pinza-busto" }));
+      outline.push(line(dartTip, L1, { role: "pinza-busto" }));
+    }
     outline.push(line(L1, U));
-    outline.push(armholeCurve(U, boxBottomCorner, S));
+    outline.push(...armholeCurve(U, L1, boxBottomCorner, S, A1));
     outline.push(line(S, A1));
     outline.push(neckCurve(A1, A2));
 
@@ -189,15 +249,15 @@ function buildPiece(m, side) {
     // apunta al ápice y se despega `dartRelease`, la inferior se proyecta a la cadera.
     const topY = m.bustHeight + m.dartRelease;
     const bottomY = waistLength + dartDown;
-    const x0 = clampDartAxis(m.bustSeparation / 2, dartWidth, waistLength, topY, bottomY, [hipCurve(H, W), line(W, L2)]);
+    const x0 = clampDartAxis(m.bustSeparation / 2, dartWidth, waistLength, topY, bottomY, [hipCurve(H, W, hipAmount), line(W, L2)]);
     darts.push(waistDart("pinza-talle-delantera", x0, waistLength, dartWidth, topY, bottomY));
   } else {
     outline.push(line(A2, D, { fold: true }));
     outline.push(line(D, Hc, { fold: true }));
     outline.push(line(Hc, H));
-    outline.push(hipCurve(H, W));
+    outline.push(hipCurve(H, W, hipAmount));
     outline.push(line(W, U));
-    outline.push(armholeCurve(U, boxBottomCorner, S));
+    outline.push(...armholeCurve(U, W, boxBottomCorner, S, A1));
     outline.push(line(S, A1));
     outline.push(neckCurve(A1, A2));
 
@@ -206,7 +266,7 @@ function buildPiece(m, side) {
     // doblez ni del costado. Punta superior hacia la escápula.
     const topY = waistLength - m.backDartUpperLength;
     const bottomY = waistLength + dartDown;
-    const x0 = clampDartAxis(W.x / 2 + (m.backDartOffset ?? 0), dartWidth, waistLength, topY, bottomY, [hipCurve(H, W), line(W, U)]);
+    const x0 = clampDartAxis(W.x / 2 + (m.backDartOffset ?? 0), dartWidth, waistLength, topY, bottomY, [hipCurve(H, W, hipAmount), line(W, U)]);
     darts.push(waistDart("pinza-talle-espalda", x0, waistLength, dartWidth, topY, bottomY));
   }
 
@@ -217,15 +277,18 @@ function buildPiece(m, side) {
     darts,
     guides,
     points,
+    sideLength,
+    bustDartDepth: isFront ? bustDartDepth : 0,
+    sideMatched,
     bounds: bounds(outline),
   };
 }
 
 export function buildBodice(measurements) {
-  return {
-    front: buildPiece(measurements, "front"),
-    back: buildPiece(measurements, "back"),
-  };
+  // La espalda va primero: su costado fija el largo del costado delantero.
+  const back = buildPiece(measurements, "back");
+  const front = buildPiece(measurements, "front", back.sideLength);
+  return { front, back };
 }
 
 function mirrorXPoint(p) {
