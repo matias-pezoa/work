@@ -1,0 +1,193 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Análisis de sesión · prueba</title><style>
+:root{--bg:#f7f6f3;--panel:#fff;--tx:#1d1d1f;--tx2:#5f5f66;--linea:#e3e1dc;--acento:#2f6fdf;
+--suave:#f0eee9;--calor:#d9542c}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--panel:#1d1d21;--tx:#ececef;--tx2:#a0a0aa;
+--linea:#2e2e34;--acento:#6b9bff;--suave:#26262b;--calor:#ff8a5c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:19px;margin:40px 0 12px}
+h3{font-size:16px;margin:0 0 8px}.sub{color:var(--tx2);margin:0 0 20px}
+.panel{background:var(--panel);border:1px solid var(--linea);border-radius:12px;padding:18px;margin-bottom:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--linea);border-radius:10px;padding:12px}
+.kpi b{display:block;font-size:22px}.kpi span{color:var(--tx2);font-size:13px}
+.nota{font-size:13px;color:var(--tx2);background:var(--suave);border-radius:8px;padding:10px 12px;margin:8px 0}
+.barra{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:14px}
+.barra .n{width:200px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barra .b{height:14px;border-radius:4px}.barra .v{color:var(--tx2);font-size:13px;white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--linea);text-align:left;vertical-align:top}
+th{color:var(--tx2);font-weight:600}td.c{text-align:center}
+.tabla-scroll{overflow-x:auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:720px){.grid2{grid-template-columns:1fr}.barra .n{width:120px}}
+.nube span{display:inline-block;margin:2px 8px 2px 0;line-height:1.2}
+.chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:var(--suave);
+color:var(--tx2);margin:2px 4px 2px 0}
+.ficha{border-left:4px solid var(--c);}
+.ficha .cab{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline}
+.mini{font-size:13px;color:var(--tx2)}
+.turno{padding:10px 0;border-bottom:1px solid var(--linea);display:grid;grid-template-columns:70px 1fr;gap:10px}
+.turno .t{color:var(--tx2);font-size:12px;font-variant-numeric:tabular-nums}
+.turno .o{font-weight:600;font-size:13px}.turno.breve{opacity:.55}
+svg text{fill:var(--tx2);font-size:11px}
+details summary{cursor:pointer;color:var(--acento)}
+</style></head><body><main>
+<h1>Análisis de sesión: prueba</h1>
+<p class="sub">Sesión sintética de prueba</p>
+<div class="kpis">
+  <div class="kpi"><b>2:19</b><span>duración analizada</span></div>
+  <div class="kpi"><b>4</b><span>oradores</span></div>
+  <div class="kpi"><b>9</b><span>intervenciones</span></div>
+  <div class="kpi"><b>248</b><span>palabras</span></div>
+</div>
+<div class="nota">Sin pysentimiento: no hay polaridad ni emociones del texto.</div>
+
+<h2>Tiempo de palabra</h2><div class="panel"><div class="barra"><div class="n" title="Senador Ramírez">Senador Ramírez</div><div style="flex:1"><div class="b" style="width:100.0%;background:#2f6fdf"></div></div><div class="v">0:48</div></div>
+<div class="barra"><div class="n" title="Senadora Contreras">Senadora Contreras</div><div style="flex:1"><div class="b" style="width:55.8%;background:#d9542c"></div></div><div class="v">0:26</div></div>
+<div class="barra"><div class="n" title="Ministra Soto">Ministra Soto</div><div style="flex:1"><div class="b" style="width:41.5%;background:#1f9e74"></div></div><div class="v">0:19</div></div>
+<div class="barra"><div class="n" title="Presidencia de la sesión">Presidencia de la sesión</div><div style="flex:1"><div class="b" style="width:32.3%;background:#b8467f"></div></div><div class="v">0:15</div></div></div>
+
+<h2>Línea de tiempo</h2>
+<div class="panel"><svg viewBox="0 0 1060 118" width="100%" role="img" aria-label="Línea de tiempo de turnos por orador"><text x="142" y="15" text-anchor="end">Senador Ramírez</text><line x1="150" x2="1050" y1="11" y2="11" stroke="currentColor" stroke-opacity=".08"/><text x="142" y="37" text-anchor="end">Senadora Contreras</text><line x1="150" x2="1050" y1="33" y2="33" stroke="currentColor" stroke-opacity=".08"/><text x="142" y="59" text-anchor="end">Ministra Soto</text><line x1="150" x2="1050" y1="55" y2="55" stroke="currentColor" stroke-opacity=".08"/><text x="142" y="81" text-anchor="end">Presidencia de la sesi</text><line x1="150" x2="1050" y1="77" y2="77" stroke="currentColor" stroke-opacity=".08"/><rect x="156.4" y="69" width="27.1" height="16" rx="2" fill="#b8467f" fill-opacity="0.60" ><title>0:01 · Presidencia de la sesión · carga 0.0 · activación 0.01
+Se abre la sesión. Tiene la palabra el senador Ramírez.</title></rect><rect x="202.6" y="3" width="123.8" height="16" rx="2" fill="#2f6fdf" fill-opacity="0.49" stroke="#ff7a45" stroke-width="1.5"><title>0:08 · Senador Ramírez · carga 18.2 · activación -0.55
+Gracias, señor Presidente. Nosotros siempre hemos dicho que la seguridad de las familias es lo primero. Hoy vivimos una crisis de inseguridad sin precedentes, l</title></rect><rect x="329.3" y="3" width="53.7" height="16" rx="2" fill="#2f6fdf" fill-opacity="0.48" ><title>0:27 · Senador Ramírez · carga 10.0 · activación -0.59
+Nunca vamos a aceptar este caos. Los chilenos exigen orden y nosotros vamos a defender la seguridad de las familias.</title></rect><rect x="402.0" y="69" width="24.4" height="16" rx="2" fill="#b8467f" fill-opacity="0.58" ><title>0:39 · Presidencia de la sesión · carga 0.0 · activación -0.09
+Gracias, senador. Tiene la palabra la senadora Contreras.</title></rect><rect x="445.4" y="25" width="98.0" height="16" rx="2" fill="#d9542c" fill-opacity="0.35" ><title>0:45 · Senadora Contreras · carga 2.9 · activación —
+Gracias, Presidente. Según el informe de la Fiscalía, los delitos violentos bajaron 4,5 por ciento el último año. Creo que es posible que existan zonas donde la</title></rect><rect x="546.3" y="25" width="74.5" height="16" rx="2" fill="#d9542c" fill-opacity="0.35" ><title>1:01 · Senadora Contreras · carga 4.0 · activación —
+Pero los datos muestran otra cosa. Quizás deberíamos mirar las cifras regionales antes de hablar de caos. El estudio de la universidad indica 12 comunas priorit</title></rect><rect x="639.8" y="69" width="13.3" height="16" rx="2" fill="#b8467f" fill-opacity="0.66" ><title>1:16 · Presidencia de la sesión · carga 0.0 · activación 0.31
+Senador Ramírez, tiene la palabra.</title></rect><rect x="672.1" y="3" width="131.7" height="16" rx="2" fill="#2f6fdf" fill-opacity="0.83" stroke="#ff7a45" stroke-width="1.5"><title>1:21 · Senador Ramírez · carga 17.0 · activación 1.14
+Presidente, la realidad es que la gente tiene miedo. Las cifras no le importan a una madre que no puede salir de noche. Es evidente que ellos no entienden la se</title></rect><rect x="822.8" y="69" width="17.2" height="16" rx="2" fill="#b8467f" fill-opacity="0.74" ><title>1:44 · Presidencia de la sesión · carga 0.0 · activación 0.71
+Ofrezco la palabra a la ministra Soto.</title></rect><rect x="859.0" y="47" width="128.5" height="16" rx="2" fill="#1f9e74" fill-opacity="0.35" ><title>1:50 · Ministra Soto · carga 4.9 · activación —
+Muchas gracias. Quiero precisar algunos datos. De acuerdo con las estadísticas oficiales, invertimos 300 millones en prevención comunitaria. Probablemente no es</title></rect><rect x="1006.4" y="69" width="18.1" height="16" rx="2" fill="#b8467f" fill-opacity="0.41" ><title>2:12 · Presidencia de la sesión · carga 0.0 · activación -0.94
+Gracias, ministra. Se levanta la sesión.</title></rect><text x="150" y="112" text-anchor="middle">0:00</text><text x="300" y="112" text-anchor="middle">0:23</text><text x="450" y="112" text-anchor="middle">0:46</text><text x="600" y="112" text-anchor="middle">1:09</text><text x="750" y="112" text-anchor="middle">1:33</text><text x="900" y="112" text-anchor="middle">1:56</text><text x="1050" y="112" text-anchor="middle">2:19</text></svg>
+<p class="mini">Cada rectángulo es un tramo de ~20 s de una intervención. Más opaco = mayor activación no verbal (voz y cuerpo, respecto del propio orador).
+Borde naranjo = carga retórica alta respecto de la sesión. Pasa el cursor sobre un tramo para ver el texto.</p></div>
+
+<h2>Marcadores retóricos (por cada 1.000 palabras)</h2>
+<div class="panel"><div class='tabla-scroll'><table><thead><tr><th>Orador</th><th class='c'>Absolutos</th><th class='c'>Nosotros</th><th class='c'>Ellos</th><th class='c'>Amenaza</th><th class='c'>Verdad dada</th><th class='c'>Intensificadores</th><th class='c'>Atenuadores</th><th class='c'>Moral</th><th class='c'>Datos/fuentes</th><th class='c'>Cifras</th><th class='c'>Preguntas</th><th class='c'>Yo</th></tr></thead><tbody><tr><td>Senador Ramírez</td><td class='c' style='background:rgba(217,84,44,0.58)'>54.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>72.1</td><td class='c' style='background:rgba(217,84,44,0.45)'>18.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>54.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>27.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>9.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.26)'>9.0</td><td class='c' style='background:rgba(217,84,44,0.13)'>9.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td></tr><tr><td>Senadora Contreras</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.39)'>33.3</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.42)'>33.3</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>100.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>33.3</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td></tr><tr><td>Ministra Soto</td><td class='c' style='background:rgba(217,84,44,0.31)'>24.4</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>24.4</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.58)'>48.8</td><td class='c' style='background:rgba(217,84,44,0.58)'>24.4</td><td class='c' style='background:rgba(217,84,44,0.57)'>97.6</td><td class='c' style='background:rgba(217,84,44,0.45)'>24.4</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td></tr><tr><td>Presidencia de la sesión</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td><td class='c' style='background:rgba(217,84,44,0.08)'>0.0</td></tr></tbody></table></div>
+<p class="mini">Léxicos editables en <code>etapas/lexicos.py</code>. Son una operacionalización de autor: describen rasgos del discurso, no prueban intención.</p></div>
+
+<h2>Palabras más usadas en la sesión</h2>
+<div class="panel"><div class='nube'><span style='font-size:26px;color:var(--acento)' title='5 veces'>seguridad</span><span style='font-size:23px;color:var(--acento)' title='4 veces'>familia</span><span style='font-size:18px;color:var(--acento)' title='2 veces'>ramírez</span><span style='font-size:18px;color:var(--acento)' title='2 veces'>gobierno</span><span style='font-size:18px;color:var(--acento)' title='2 veces'>cao</span><span style='font-size:18px;color:var(--acento)' title='2 veces'>cifra</span><span style='font-size:18px;color:var(--acento)' title='2 veces'>dato</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>abrir</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>contreras</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>ofrecer</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>soto</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>levantar</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>vivir</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>crisis</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>inseguridad</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>precedente</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>delincuencia</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>avanzar</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>esperar</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>aceptar</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>chileno</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>exigir</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>orden</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>defender</span><span style='font-size:15px;color:var(--acento)' title='1 veces'>realidad</span></div></div>
+
+<h2>Oradores</h2>
+
+<div class="panel ficha" style="--c:#2f6fdf">
+  <div class="cab"><h3>Senador Ramírez</h3>
+  <span class="mini">0:48 de palabra (43.5%) · 2 intervenciones ·
+  111 palabras · 139 pal/min · diversidad 0.60</span></div>
+  <div class="grid2">
+    <div>
+      <p class="mini">Palabras más repetidas</p><div class='nube'><span style='font-size:26px;color:#2f6fdf' title='4 veces'>seguridad</span><span style='font-size:26px;color:#2f6fdf' title='4 veces'>familia</span><span style='font-size:19px;color:#2f6fdf' title='2 veces'>gobierno</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>vivir</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>crisis</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>inseguridad</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>precedente</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>delincuencia</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>avanzar</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>esperar</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>aceptar</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>cao</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>chileno</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>exigir</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>orden</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>defender</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>realidad</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>gente</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>miedo</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>cifra</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>importar</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>madre</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>salir</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>noche</span><span style='font-size:16px;color:#2f6fdf' title='1 veces'>evidente</span></div>
+      <p class="mini" style="margin-top:12px">Palabras distintivas (más que el resto de la sesión; * = significativa p&lt;0,01)</p>
+      <div><span class='chip' title='LL 6.84 · 4 veces vs 0 en el resto'>familia *</span> <span class='chip' title='LL 2.94 · 4 veces vs 1 en el resto'>seguridad</span></div>
+      <p class="mini" style="margin-top:12px">Expresiones de dos palabras</p><div style="font-size:13px">delincuencia avanza (1), chilenos exigen (1), exigen orden (1), familias absolutamente (1)</div>
+      <p class="mini" style="margin-top:12px">Frases que repite</p><ul style="margin:4px 0;padding-left:18px;font-size:13px"><li>«la seguridad de las familias» <span class='mini'>×4</span></li></ul>
+    </div>
+    <div>
+      <p class="mini">Voz (promedio de sus turnos)</p>
+      <table><tbody>
+        <tr><td>Tono medio</td><td>137 Hz</td></tr>
+        <tr><td>Variación de tono</td><td>0.71 semitonos</td></tr>
+        <tr><td>Volumen medio</td><td>74.2 dB</td></tr>
+        <tr><td>Velocidad de articulación</td><td>2.52 pal/s</td></tr>
+        <tr><td>Pausas</td><td>10.4 /min</td></tr>
+      </tbody></table>
+      <p class="mini" style="margin-top:12px">Texto: polaridad — (−1 negativa, +1 positiva) · emociones: —</p>
+      <p class="mini" style="margin-top:12px">Rostro y cuerpo</p><table><tbody><tr><td>Cuadros con su rostro</td><td>239 cuadros · plano típico: plano_medio</td></tr><tr><td>Tensión del ceño</td><td>0.206</td></tr><tr><td>Cejas elevadas</td><td>0.024</td></tr><tr><td>Presión de labios</td><td>0.025</td></tr><tr><td>Sonrisa</td><td>0.024</td></tr><tr><td>Energía gestual (manos)</td><td>0.34 anchos de hombro/s</td></tr><tr><td>Movimiento de cabeza</td><td>3.6 °/s</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="panel ficha" style="--c:#d9542c">
+  <div class="cab"><h3>Senadora Contreras</h3>
+  <span class="mini">0:26 de palabra (24.3%) · 1 intervenciones ·
+  60 palabras · 134 pal/min · diversidad 0.82</span></div>
+  <div class="grid2">
+    <div>
+      <p class="mini">Palabras más repetidas</p><div class='nube'><span style='font-size:26px;color:#d9542c' title='1 veces'>informe</span><span style='font-size:26px;color:#d9542c' title='1 veces'>fiscalía</span><span style='font-size:26px;color:#d9542c' title='1 veces'>delito</span><span style='font-size:26px;color:#d9542c' title='1 veces'>violento</span><span style='font-size:26px;color:#d9542c' title='1 veces'>bajar</span><span style='font-size:26px;color:#d9542c' title='1 veces'>año</span><span style='font-size:26px;color:#d9542c' title='1 veces'>existir</span><span style='font-size:26px;color:#d9542c' title='1 veces'>zona</span><span style='font-size:26px;color:#d9542c' title='1 veces'>percepción</span><span style='font-size:26px;color:#d9542c' title='1 veces'>temor</span><span style='font-size:26px;color:#d9542c' title='1 veces'>aumentar</span><span style='font-size:26px;color:#d9542c' title='1 veces'>atender él</span><span style='font-size:26px;color:#d9542c' title='1 veces'>dato</span><span style='font-size:26px;color:#d9542c' title='1 veces'>mostrar</span><span style='font-size:26px;color:#d9542c' title='1 veces'>cosa</span><span style='font-size:26px;color:#d9542c' title='1 veces'>mirar</span><span style='font-size:26px;color:#d9542c' title='1 veces'>cifra</span><span style='font-size:26px;color:#d9542c' title='1 veces'>regional</span><span style='font-size:26px;color:#d9542c' title='1 veces'>hablar</span><span style='font-size:26px;color:#d9542c' title='1 veces'>cao</span><span style='font-size:26px;color:#d9542c' title='1 veces'>estudio</span><span style='font-size:26px;color:#d9542c' title='1 veces'>universidad</span><span style='font-size:26px;color:#d9542c' title='1 veces'>indicar</span><span style='font-size:26px;color:#d9542c' title='1 veces'>comuna</span><span style='font-size:26px;color:#d9542c' title='1 veces'>prioritario</span></div>
+      <p class="mini" style="margin-top:12px">Palabras distintivas (más que el resto de la sesión; * = significativa p&lt;0,01)</p>
+      <div>—</div>
+      <p class="mini" style="margin-top:12px">Expresiones de dos palabras</p><div style="font-size:13px">delitos violentos (1), violentos bajaron (1), existan zonas (1), temor aumentó (1), datos muestran (1), deberíamos mirar (1), cifras regionales (1), universidad indica (1)</div>
+      <p class="mini" style="margin-top:12px">Frases que repite</p><ul style="margin:4px 0;padding-left:18px;font-size:13px"><li class='mini'>Sin frases repetidas</li></ul>
+    </div>
+    <div>
+      <p class="mini">Voz (promedio de sus turnos)</p>
+      <table><tbody>
+        <tr><td>Tono medio</td><td>210 Hz</td></tr>
+        <tr><td>Variación de tono</td><td>0.58 semitonos</td></tr>
+        <tr><td>Volumen medio</td><td>70.4 dB</td></tr>
+        <tr><td>Velocidad de articulación</td><td>2.48 pal/s</td></tr>
+        <tr><td>Pausas</td><td>9.2 /min</td></tr>
+      </tbody></table>
+      <p class="mini" style="margin-top:12px">Texto: polaridad — (−1 negativa, +1 positiva) · emociones: —</p>
+      <p class="mini" style="margin-top:12px">Rostro y cuerpo</p><table><tbody><tr><td>Cuadros con su rostro</td><td>134 cuadros · plano típico: plano_medio</td></tr><tr><td>Tensión del ceño</td><td>0.025</td></tr><tr><td>Cejas elevadas</td><td>0.025</td></tr><tr><td>Presión de labios</td><td>0.025</td></tr><tr><td>Sonrisa</td><td>0.024</td></tr><tr><td>Energía gestual (manos)</td><td>0.11 anchos de hombro/s</td></tr><tr><td>Movimiento de cabeza</td><td>1.5 °/s</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="panel ficha" style="--c:#1f9e74">
+  <div class="cab"><h3>Ministra Soto</h3>
+  <span class="mini">0:19 de palabra (18.1%) · 1 intervenciones ·
+  41 palabras · 123 pal/min · diversidad 0.90</span></div>
+  <div class="grid2">
+    <div>
+      <p class="mini">Palabras más repetidas</p><div class='nube'><span style='font-size:26px;color:#1f9e74' title='1 veces'>querer</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>precisar</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>dato</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>estadística</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>oficial</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>invertir</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>millón</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>prevención</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>comunitario</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>probablemente</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>suficiente</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>reconocer</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>pensar</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>trabajar</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>responsabilidad</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>seguridad</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>derecho</span><span style='font-size:26px;color:#1f9e74' title='1 veces'>persona</span></div>
+      <p class="mini" style="margin-top:12px">Palabras distintivas (más que el resto de la sesión; * = significativa p&lt;0,01)</p>
+      <div>—</div>
+      <p class="mini" style="margin-top:12px">Expresiones de dos palabras</p><div style="font-size:13px">quiero precisar (1), estadísticas oficiales (1), oficiales invertimos (1), invertimos millones (1), prevención comunitaria (1), comunitaria probablemente (1), reconocemos pienso (1), debemos trabajar (1)</div>
+      <p class="mini" style="margin-top:12px">Frases que repite</p><ul style="margin:4px 0;padding-left:18px;font-size:13px"><li class='mini'>Sin frases repetidas</li></ul>
+    </div>
+    <div>
+      <p class="mini">Voz (promedio de sus turnos)</p>
+      <table><tbody>
+        <tr><td>Tono medio</td><td>192 Hz</td></tr>
+        <tr><td>Variación de tono</td><td>0.63 semitonos</td></tr>
+        <tr><td>Volumen medio</td><td>69.4 dB</td></tr>
+        <tr><td>Velocidad de articulación</td><td>2.32 pal/s</td></tr>
+        <tr><td>Pausas</td><td>12.0 /min</td></tr>
+      </tbody></table>
+      <p class="mini" style="margin-top:12px">Texto: polaridad — (−1 negativa, +1 positiva) · emociones: —</p>
+      <p class="mini" style="margin-top:12px">Rostro y cuerpo</p><table><tbody><tr><td>Cuadros con su rostro</td><td>99 cuadros · plano típico: plano_medio</td></tr><tr><td>Tensión del ceño</td><td>0.024</td></tr><tr><td>Cejas elevadas</td><td>0.025</td></tr><tr><td>Presión de labios</td><td>0.024</td></tr><tr><td>Sonrisa</td><td>0.026</td></tr><tr><td>Energía gestual (manos)</td><td>0.11 anchos de hombro/s</td></tr><tr><td>Movimiento de cabeza</td><td>1.6 °/s</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="panel ficha" style="--c:#b8467f">
+  <div class="cab"><h3>Presidencia de la sesión</h3>
+  <span class="mini">0:15 de palabra (14.1%) · 5 intervenciones ·
+  36 palabras · 139 pal/min · diversidad 0.47</span></div>
+  <div class="grid2">
+    <div>
+      <p class="mini">Palabras más repetidas</p><div class='nube'><span style='font-size:26px;color:#b8467f' title='2 veces'>ramírez</span><span style='font-size:19px;color:#b8467f' title='1 veces'>abrir</span><span style='font-size:19px;color:#b8467f' title='1 veces'>contreras</span><span style='font-size:19px;color:#b8467f' title='1 veces'>ofrecer</span><span style='font-size:19px;color:#b8467f' title='1 veces'>soto</span><span style='font-size:19px;color:#b8467f' title='1 veces'>levantar</span></div>
+      <p class="mini" style="margin-top:12px">Palabras distintivas (más que el resto de la sesión; * = significativa p&lt;0,01)</p>
+      <div>—</div>
+      <p class="mini" style="margin-top:12px">Expresiones de dos palabras</p><div style="font-size:13px">—</div>
+      <p class="mini" style="margin-top:12px">Frases que repite</p><ul style="margin:4px 0;padding-left:18px;font-size:13px"><li class='mini'>Sin frases repetidas</li></ul>
+    </div>
+    <div>
+      <p class="mini">Voz (promedio de sus turnos)</p>
+      <table><tbody>
+        <tr><td>Tono medio</td><td>111 Hz</td></tr>
+        <tr><td>Variación de tono</td><td>0.59 semitonos</td></tr>
+        <tr><td>Volumen medio</td><td>68.5 dB</td></tr>
+        <tr><td>Velocidad de articulación</td><td>2.53 pal/s</td></tr>
+        <tr><td>Pausas</td><td>10.3 /min</td></tr>
+      </tbody></table>
+      <p class="mini" style="margin-top:12px">Texto: polaridad — (−1 negativa, +1 positiva) · emociones: —</p>
+      <p class="mini" style="margin-top:12px">Rostro y cuerpo</p><p class='mini'>Sin turnos donde su rostro aparezca hablando en pantalla.</p>
+    </div>
+  </div>
+</div>
+
+<h2>Transcripción anotada</h2>
+<div class="panel"><details><summary>Mostrar transcripción completa (9 intervenciones)</summary>
+<div class='turno'><div class='t'>0:01</div><div><span class='o' style='color:#b8467f'>Presidencia de la sesión</span><p style='margin:4px 0'>Se abre la sesión. Tiene la palabra el senador Ramírez.</p></div></div><div class='turno'><div class='t'>0:08</div><div><span class='o' style='color:#2f6fdf'>Senador Ramírez</span><p style='margin:4px 0'><span class='t'>0:08</span> <span class='chip' style='color:var(--calor)'>carga retórica alta</span>Gracias, señor Presidente. Nosotros siempre hemos dicho que la seguridad de las familias es lo primero. Hoy vivimos una crisis de inseguridad sin precedentes, la delincuencia avanza y el gobierno no hace nada. Todos sabemos que la seguridad de las familias no puede esperar.</p><p style='margin:4px 0'><span class='t'>0:27</span> Nunca vamos a aceptar este caos. Los chilenos exigen orden y nosotros vamos a defender la seguridad de las familias.</p></div></div><div class='turno'><div class='t'>0:39</div><div><span class='o' style='color:#b8467f'>Presidencia de la sesión</span><p style='margin:4px 0'>Gracias, senador. Tiene la palabra la senadora Contreras.</p></div></div><div class='turno'><div class='t'>0:45</div><div><span class='o' style='color:#d9542c'>Senadora Contreras</span><p style='margin:4px 0'><span class='t'>0:45</span> Gracias, Presidente. Según el informe de la Fiscalía, los delitos violentos bajaron 4,5 por ciento el último año. Creo que es posible que existan zonas donde la percepción de temor aumentó, y eso hay que atenderlo.</p><p style='margin:4px 0'><span class='t'>1:01</span> Pero los datos muestran otra cosa. Quizás deberíamos mirar las cifras regionales antes de hablar de caos. El estudio de la universidad indica 12 comunas prioritarias.</p></div></div><div class='turno'><div class='t'>1:16</div><div><span class='o' style='color:#b8467f'>Presidencia de la sesión</span><p style='margin:4px 0'>Senador Ramírez, tiene la palabra.</p></div></div><div class='turno'><div class='t'>1:21</div><div><span class='o' style='color:#2f6fdf'>Senador Ramírez</span><p style='margin:4px 0'><span class='chip' style='color:var(--calor)'>carga retórica alta</span><span class='chip'>activación no verbal alta</span>Presidente, la realidad es que la gente tiene miedo. Las cifras no le importan a una madre que no puede salir de noche. Es evidente que ellos no entienden la seguridad de las familias. Absolutamente nadie en este gobierno se hace cargo. Es gravísimo. Es una vergüenza.</p></div></div><div class='turno'><div class='t'>1:44</div><div><span class='o' style='color:#b8467f'>Presidencia de la sesión</span><p style='margin:4px 0'>Ofrezco la palabra a la ministra Soto.</p></div></div><div class='turno'><div class='t'>1:50</div><div><span class='o' style='color:#1f9e74'>Ministra Soto</span><p style='margin:4px 0'>Muchas gracias. Quiero precisar algunos datos. De acuerdo con las estadísticas oficiales, invertimos 300 millones en prevención comunitaria. Probablemente no es suficiente y lo reconocemos. Pienso que debemos trabajar juntos, con responsabilidad, porque la seguridad es un derecho de todas las personas.</p></div></div><div class='turno'><div class='t'>2:12</div><div><span class='o' style='color:#b8467f'>Presidencia de la sesión</span><p style='margin:4px 0'>Gracias, ministra. Se levanta la sesión.</p></div></div></details></div>
+
+<p class="mini" style="margin-top:40px">Transcripción automática: puede contener errores, sobre todo en nombres propios y cuando hablan varias personas a la vez.
+Los índices de expresión facial describen movimientos observables (blendshapes de MediaPipe), no emociones internas.</p>
+</main></body></html>

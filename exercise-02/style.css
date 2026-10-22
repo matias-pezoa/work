@@ -1,0 +1,915 @@
+:root{
+  --black:#060606;
+  --white:#f4f4f1;
+  --gray-1:#cfcfca;
+  --gray-2:#a4a49e;   /* subido: el gris anterior no llegaba a 4.5:1 en microtipografía */
+  --gray-3:#4a4a46;
+  --line:rgba(244,244,241,.72);
+  --line-soft:rgba(244,244,241,.26);
+  --line-faint:rgba(244,244,241,.13);
+
+  /* panel casi opaco pero con un pelo de tinte azul-neutro (hacia el cian) para
+     que no lea como negro plano recortado sobre la escena */
+  --panel-bg:rgba(9,10,12,.94);
+  --panel-hi:inset 0 1px 0 rgba(244,244,241,.05);  /* borde superior "iluminado" */
+  --hover-fill:rgba(244,244,241,.06);
+  --field-bg:rgba(255,255,255,.03);
+
+  --cyan:#3fe6d2;
+  --coral:#ff6a52;
+  --violet:#a06bff;
+  --top:var(--cyan);
+  --middle:var(--coral);
+  --base:var(--violet);
+
+  --font-display:"Oswald","Arial Narrow",Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+
+  --bar-h:34px;
+  --edge:24px;                               /* inset uniforme de todos los paneles al borde */
+  --stack:calc(var(--bar-h) + 24px);         /* tope común: masthead y botones arrancan acá */
+  --panel-open:calc(var(--bar-h) + 64px);    /* donde abren los paneles desplegables de la derecha */
+  --related-reserve:372px;                   /* alto que related-panel reserva bajo explore-panel (borde + lista + gap) */
+  --ease:cubic-bezier(.2,.6,.2,1);
+}
+
+*{box-sizing:border-box}
+
+html,body{
+  margin:0;
+  height:100%;
+  background:var(--black);
+  color:var(--white);
+  font-family:var(--font-mono);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+body{padding-top:var(--bar-h)}
+
+::selection{background:var(--cyan);color:var(--black)}
+
+/* ---------- textura: grano de película, muy sutil ----------
+   soft-light rinde el ruido de forma pareja sobre el negro Y sobre los
+   paneles (overlay se apagaba del todo en las zonas oscuras). */
+.grain{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  pointer-events:none;
+  opacity:.09;
+  mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* ---------- accesibilidad ---------- */
+.sr-only{
+  position:absolute;
+  width:1px;height:1px;
+  padding:0;margin:-1px;
+  overflow:hidden;
+  clip:rect(0 0 0 0);
+  white-space:nowrap;
+  border:0;
+}
+
+/* foco visible y consistente en todo control accionable */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+.results-list li:focus-visible,
+.related-list li:focus-visible{
+  outline:2px solid var(--cyan);
+  outline-offset:2px;
+}
+
+/* ---------- fixed frame bar ---------- */
+.frame-bar-left{display:flex;align-items:center;gap:16px}
+.frame-nav{display:flex;align-items:center;gap:8px}
+.frame-nav-btn{
+  background:transparent;border:1px solid var(--line-soft);color:var(--gray-1);
+  font:inherit;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 10px;line-height:1.4;cursor:pointer;text-decoration:none;
+  transition:background-color .16s var(--ease),color .16s var(--ease),border-color .16s var(--ease);
+}
+.frame-nav-btn:hover{background:var(--hover-fill);color:var(--white);border-color:var(--line)}
+
+.frame-bar{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:var(--bar-h);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+  border-bottom:1px solid var(--line-soft);
+  background:var(--black);
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--gray-1);
+  z-index:900;
+}
+
+#scene-root{
+  position:fixed;
+  inset:0;
+  z-index:0;
+}
+#scene-root canvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+
+/* ---------- carga ---------- */
+.loading{
+  position:fixed;
+  inset:0;
+  z-index:50;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  background:var(--black);
+  transition:opacity .5s ease;
+}
+.loading p{margin:0}
+.loading p:first-child{
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:22px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+/* hairline que barre bajo el wordmark mientras carga */
+.loading p:first-child::after{
+  content:"";
+  display:block;
+  height:1px;
+  margin:12px auto 0;
+  width:120px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  background-size:200% 100%;
+  animation:load-scan 1.4s var(--ease) infinite;
+}
+.loading-sub{
+  font-size:10px;
+  color:var(--gray-2);
+  letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.loading-sub::after{
+  content:"";
+  animation:load-dots 1.4s steps(4,end) infinite;
+}
+@keyframes load-scan{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@keyframes load-dots{0%{content:""}25%{content:"·"}50%{content:"··"}75%{content:"···"}}
+.loading.hidden{opacity:0;pointer-events:none}
+
+/* ---------- tratamiento común de panel ----------
+   Sólo lo visual vive acá — cada panel fija su propia posición/z-index más
+   abajo. Todos comparten el inset de borde (--edge) y el mismo aire interno. */
+.panel{
+  background:var(--panel-bg);
+  border:1px solid var(--line-soft);
+  box-shadow:var(--panel-hi);
+  padding:18px;
+}
+
+.info-label{
+  margin:0;
+  font-size:10px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+}
+.info-value{
+  margin:3px 0 0;
+  font-size:12.5px;
+  line-height:1.45;
+  color:var(--gray-1);
+}
+
+/* ---------- masthead ---------- */
+.masthead{
+  position:fixed;
+  top:var(--stack);
+  left:var(--edge);
+  z-index:10;
+  pointer-events:none;
+  max-width:min(420px, calc(100vw - 48px));
+}
+.eyebrow{
+  display:block;
+  margin:0 0 9px;
+  font-family:var(--font-mono);
+  font-size:10px;
+  font-weight:500;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+}
+.wordmark{
+  margin:0;
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:clamp(26px,3.6vw,40px);
+  letter-spacing:.005em;
+  line-height:1;
+  text-transform:uppercase;
+}
+.tagline{
+  margin:9px 0 0;
+  font-size:11px;
+  letter-spacing:.04em;
+  color:var(--gray-2);
+}
+
+/* ---------- acciones (mapa / leyenda) ---------- */
+.top-actions{
+  position:fixed;
+  top:var(--stack);
+  right:var(--edge);
+  z-index:11;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:8px;
+  max-width:calc(100vw - 48px);
+}
+.icon-btn{
+  background:transparent;
+  border:1px solid var(--line-soft);
+  color:var(--gray-1);
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  padding:8px 14px;
+  cursor:pointer;
+  transition:background-color .16s var(--ease),color .16s var(--ease),border-color .16s var(--ease);
+}
+.icon-btn:hover{background:var(--hover-fill);color:var(--white);border-color:var(--line)}
+.icon-btn:active{background:rgba(244,244,241,.12)}
+
+.legend-panel{
+  position:fixed;
+  top:var(--panel-open);
+  right:var(--edge);
+  z-index:11;
+  width:270px;
+  max-width:calc(100vw - 48px);
+}
+.legend-panel h2{
+  margin:0 0 12px;
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:13px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--white);
+}
+.legend-panel dl{margin:0}
+.legend-panel dt{
+  font-size:10px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--gray-1);
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid var(--line-faint);
+}
+.legend-panel dt:first-child{margin-top:0;padding-top:0;border-top:none}
+.legend-panel dd{
+  margin:4px 0 0;
+  font-size:11.5px;
+  line-height:1.55;
+  color:var(--gray-1);
+}
+.legend-note{
+  margin:14px 0 0;
+  padding-top:12px;
+  border-top:1px solid var(--line-faint);
+  font-size:11px;
+  line-height:1.55;
+  color:var(--gray-2);
+}
+
+/* ---------- ficha del perfume (specimen card) ---------- */
+.info-panel{
+  position:fixed;
+  z-index:10;
+  left:var(--edge);
+  bottom:var(--edge);
+  width:284px;
+  max-width:calc(100vw - 48px);
+}
+.info-cat{
+  float:right;
+  font-size:10px;
+  letter-spacing:.12em;
+  color:var(--gray-3);
+}
+#info-name{
+  margin:3px 0 13px;
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:22px;
+  line-height:1.12;
+  letter-spacing:.005em;
+  text-transform:uppercase;
+  text-wrap:balance;
+}
+.info-row{
+  display:flex;
+  gap:22px;
+  margin-top:13px;
+}
+.info-row > div{flex:1;min-width:0}
+.note-block{
+  margin-top:13px;
+  padding-top:12px;
+  border-top:1px solid var(--line-faint);
+}
+/* la etiqueta de capa en la ficha lleva un tick del color de la capa, en vez
+   de teñir todo el texto (que competía con la lista de notas). Sólo en la
+   ficha — no en los botones .layer-btn que comparten estas clases. */
+.note-block .info-label{
+  color:var(--gray-2);
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.note-block .info-label::before{
+  content:"";
+  width:6px;height:6px;
+  flex:0 0 auto;
+  background:var(--gray-3);
+}
+.note-block .note-top::before{background:var(--top)}
+.note-block .note-middle::before{background:var(--middle)}
+.note-block .note-base::before{background:var(--base)}
+.note-list{
+  margin:5px 0 0;
+  font-size:11px;
+  line-height:1.6;
+  color:var(--gray-1);
+}
+.rating-row{
+  margin-top:13px;
+  padding-top:12px;
+  border-top:1px solid var(--line-faint);
+  font-size:10px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+}
+
+/* ---------- capas visibles ---------- */
+.layer-toggles{
+  position:fixed;
+  bottom:var(--edge);
+  left:50%;
+  transform:translateX(-50%);
+  z-index:10;
+  display:flex;
+  gap:1px;
+}
+.layer-btn{
+  font-family:var(--font-mono);
+  font-size:10px;
+  font-weight:500;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  padding:10px 18px;
+  background:var(--panel-bg);
+  box-shadow:var(--panel-hi);
+  border:1px solid var(--line-soft);
+  color:var(--gray-2);
+  cursor:pointer;
+  transition:color .16s var(--ease),border-color .16s var(--ease),background-color .16s var(--ease);
+}
+.layer-btn:hover{color:var(--gray-1);background:var(--hover-fill)}
+.layer-btn.active{color:var(--white);border-color:var(--line)}
+.layer-btn[data-layer="top"].active{color:var(--top);border-color:var(--top)}
+.layer-btn[data-layer="middle"].active{color:var(--middle);border-color:var(--middle)}
+.layer-btn[data-layer="base"].active{color:var(--base);border-color:var(--base)}
+
+/* ---------- explore / search ----------
+   Sits below the legend toggle, in the same top-right slot the legend
+   panel opens into — when the legend is toggled open it overlays this
+   (higher z-index) rather than the two competing for separate space.
+   `bottom` reserves the space related-panel needs below it (its own
+   24px offset + ~300px for a full 6-item list + a 24px gap), so the
+   two never overlap regardless of viewport height; the results list
+   scrolls internally instead of growing the panel further. */
+.explore-panel{
+  position:fixed;
+  top:var(--panel-open);
+  right:var(--edge);
+  bottom:var(--related-reserve);
+  z-index:10;
+  width:270px;
+  max-width:calc(100vw - 48px);
+  max-height:440px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+#search-input{
+  width:100%;
+  background:transparent;
+  border:none;
+  border-bottom:1px solid var(--line-soft);
+  color:var(--white);
+  font-family:var(--font-mono);
+  font-size:12px;
+  padding:2px 0 9px;
+  outline:none;
+  transition:border-color .16s var(--ease);
+}
+#search-input::placeholder{color:var(--gray-2)}
+#search-input:hover{border-bottom-color:var(--line)}
+#search-input:focus{border-bottom-color:var(--cyan)}
+#search-input::-webkit-search-cancel-button{filter:invert(.7)}
+
+.explore-filters{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:11px;
+  font-size:10px;
+}
+/* campos: mismo tratamiento — fondo apenas visible, borde reactivo */
+#family-filter,
+.year-range input{
+  background:var(--field-bg);
+  color:var(--gray-1);
+  border:1px solid var(--line-soft);
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  padding:6px 6px;
+  transition:border-color .16s var(--ease),background-color .16s var(--ease);
+}
+#family-filter:hover,
+.year-range input:hover{border-color:var(--line)}
+#family-filter:focus,
+.year-range input:focus{border-color:var(--cyan);outline:none}
+#family-filter{
+  flex:1;
+  min-width:0;
+  -webkit-appearance:none;
+  appearance:none;
+  padding-right:20px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='6'><path d='M0 0l4.5 5L9 0z' fill='%23a4a49e'/></svg>");
+  background-repeat:no-repeat;
+  background-position:right 6px center;
+}
+#family-filter option{background:#0b0b0d;color:var(--gray-1)}
+.year-range{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  color:var(--gray-2);
+}
+.year-range input{
+  width:56px;
+  -moz-appearance:textfield;
+}
+/* el spinner nativo de type="number" no cabe en los 52px y desborda la
+   caja; se oculta porque inputmode="numeric" ya cubre el teclado móvil */
+.year-range input::-webkit-outer-spin-button,
+.year-range input::-webkit-inner-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+
+.results-list{
+  list-style:none;
+  margin:12px -18px 0;   /* sangra hasta el borde del panel: el hover ocupa todo el ancho */
+  padding:0;
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  border-top:1px solid var(--line-faint);
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-soft) transparent;
+}
+.results-list li{
+  padding:9px 18px;
+  border-bottom:1px solid var(--line-faint);
+  cursor:pointer;
+  font-size:11px;
+  transition:background-color .13s var(--ease),color .13s var(--ease),box-shadow .13s var(--ease);
+}
+/* hover ≠ seleccionado: hover es un realce tenue, la selección es el ancla */
+.results-list li:hover{background:var(--hover-fill)}
+.results-list li.selected{
+  background:var(--white);
+  color:var(--black);
+  box-shadow:inset 3px 0 0 var(--cyan);
+}
+.result-name{display:block;color:inherit;font-size:12px}
+.result-meta{
+  display:block;
+  font-size:10px;
+  color:inherit;
+  opacity:.7;
+  margin-top:3px;
+}
+.results-count{
+  margin:11px 0 0;
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  font-variant-numeric:tabular-nums;
+}
+.results-empty{
+  padding:14px 18px !important;
+  font-size:11.5px;
+  line-height:1.5;
+  color:var(--gray-2);
+  cursor:default !important;
+}
+.results-empty:hover{background:none !important}
+
+/* ---------- perfumes relacionados ---------- */
+.related-panel{
+  position:fixed;
+  z-index:10;
+  bottom:var(--edge);
+  right:var(--edge);
+  width:224px;
+  max-width:calc(100vw - 48px);
+}
+.related-list{
+  list-style:none;
+  margin:9px -18px -4px;
+  padding:0;
+  max-height:298px;
+  overflow-y:auto;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line-soft) transparent;
+}
+.related-list li{
+  padding:8px 18px;
+  font-size:11px;
+  cursor:pointer;
+  color:var(--gray-1);
+  border-bottom:1px solid var(--line-faint);
+  transition:background-color .13s var(--ease),color .13s var(--ease);
+}
+.related-list li:last-child{border-bottom:none}
+.related-list li:hover{background:var(--hover-fill);color:var(--white)}
+.related-list .rel-name{display:block;font-size:12px}
+.related-list .rel-meta{font-size:10px;color:var(--gray-2);opacity:1;margin-top:2px;display:block}
+
+/* ---------- tooltip ---------- */
+.tooltip{
+  position:fixed;
+  z-index:40;
+  pointer-events:none;
+  background:var(--black);
+  border:1px solid var(--line-soft);
+  padding:8px 10px;
+  font-family:var(--font-mono);
+  font-size:11px;
+  line-height:1.55;
+  max-width:240px;
+  color:var(--gray-1);
+  transform:translate(14px, 14px);
+}
+.tooltip strong{
+  display:block;
+  color:var(--white);
+  font-size:11px;
+  letter-spacing:.03em;
+  margin-bottom:3px;
+}
+
+/* ---------- mapa de notas ---------- */
+.map-panel{
+  position:fixed;
+  top:var(--bar-h);
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:200;
+  background:var(--black);
+  display:flex;
+  flex-direction:column;
+}
+.map-panel[hidden]{display:none}
+.map-header{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  gap:20px;
+  padding:14px 24px;
+  border-bottom:1px solid var(--line-soft);
+}
+.map-header-title{display:flex;flex-direction:column;gap:2px}
+.map-focus-name{
+  margin:0;
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:17px;
+  letter-spacing:.005em;
+  text-transform:uppercase;
+  color:var(--white);
+}
+.map-status{
+  margin-left:auto;
+  font-size:10px;
+  letter-spacing:.05em;
+  color:var(--gray-2);
+  white-space:nowrap;
+}
+.map-root{
+  position:relative;
+  flex:1 1 auto;
+  min-height:0;
+}
+.map-root canvas{display:block;width:100%;height:100%}
+
+.map-legend-panel{
+  position:fixed;
+  z-index:201;
+  top:calc(var(--bar-h) + 68px);
+  right:var(--edge);
+  width:270px;
+  max-width:calc(100vw - 48px);
+}
+.map-legend-panel h2{
+  margin:0 0 12px;
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:13px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--white);
+}
+.map-legend-panel dl{margin:0}
+.legend-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid var(--line-faint);
+}
+.legend-row:first-child{margin-top:0;padding-top:0;border-top:none}
+.legend-preview{
+  flex:0 0 auto;
+  width:46px;
+  height:46px;
+  background:#000;
+  border:1px solid var(--line-faint);
+}
+.map-legend-panel dt{
+  font-size:10px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--gray-1);
+}
+.map-legend-panel dd{
+  margin:4px 0 0;
+  font-size:11px;
+  line-height:1.5;
+  color:var(--gray-1);
+}
+.map-legend-panel .legend-note{
+  margin:14px 0 0;
+  padding-top:12px;
+  border-top:1px solid var(--line-faint);
+  font-size:10.5px;
+  line-height:1.5;
+  color:var(--gray-2);
+}
+
+.map-label{
+  position:absolute;
+  z-index:5;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.02em;
+  color:var(--gray-1);
+  text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.85);
+  white-space:nowrap;
+  max-width:170px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  transition:opacity .2s linear,color .2s linear;
+}
+.map-label-focus{
+  color:var(--cyan);
+  font-size:12px;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.map-label-dim{opacity:.28}
+
+/* rótulo de "nota puente" en el borde de cada grupo */
+.map-rim-label{
+  position:absolute;
+  z-index:4;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  font-family:var(--font-mono);
+  font-size:9.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  text-shadow:0 1px 3px rgba(0,0,0,.9);
+  white-space:nowrap;
+  border:1px solid var(--line-faint);
+  padding:3px 7px;
+  background:rgba(6,6,6,.72);
+}
+
+.map-info-card{
+  position:fixed;
+  z-index:201;
+  left:var(--edge);
+  bottom:var(--edge);
+  width:284px;
+  max-width:calc(100vw - 48px);
+}
+.map-info-name{
+  margin:3px 0 9px;
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:18px;
+  line-height:1.15;
+  letter-spacing:.005em;
+  text-transform:uppercase;
+  color:var(--white);
+}
+.map-view-btn{
+  display:block;
+  width:100%;
+  margin-top:14px;
+  text-align:center;
+}
+
+.map-hint{
+  position:fixed;
+  z-index:201;
+  bottom:var(--edge);
+  left:50%;
+  transform:translateX(-50%);
+  margin:0;
+  font-size:10px;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  background:var(--panel-bg);
+  box-shadow:var(--panel-hi);
+  border:1px solid var(--line-soft);
+  padding:8px 14px;
+  white-space:nowrap;
+}
+
+/* ---------- infografía / lámina ---------- */
+.poster-panel{
+  position:fixed;
+  top:var(--bar-h);
+  left:0;right:0;bottom:0;
+  z-index:200;
+  background:var(--black);
+  display:flex;
+  flex-direction:column;
+}
+.poster-panel[hidden]{display:none}
+.poster-bar{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  padding:14px 24px;
+  border-bottom:1px solid var(--line-soft);
+}
+.poster-bar-title{display:flex;flex-direction:column;gap:2px}
+.poster-actions{display:flex;gap:8px;align-items:center}
+.export-menu{position:relative}
+.export-list{
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  min-width:186px;
+  background:var(--panel-bg);
+  border:1px solid var(--line-soft);
+  box-shadow:var(--panel-hi);
+  display:flex;
+  flex-direction:column;
+  z-index:5;
+}
+.export-list[hidden]{display:none}
+.export-list button{
+  background:transparent;
+  border:0;
+  border-bottom:1px solid var(--line-faint);
+  color:var(--gray-1);
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  padding:11px 14px;
+  text-align:left;
+  cursor:pointer;
+  transition:background-color .15s var(--ease),color .15s var(--ease);
+}
+.export-list button:last-child{border-bottom:0}
+.export-list button:hover{background:var(--hover-fill);color:var(--white)}
+.export-list button:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+.poster-stage{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  display:grid;
+  place-items:center;
+  padding:26px;
+}
+.poster-stage svg{
+  display:block;
+  width:auto;
+  height:auto;
+  max-width:100%;
+  max-height:100%;
+  background:var(--black);
+  border:1px solid var(--line-soft);
+}
+.poster-empty{
+  font-size:12px;
+  line-height:1.6;
+  color:var(--gray-2);
+  max-width:36ch;
+  text-align:center;
+}
+
+/* ---------- scrollbars (webkit; el resto usa scrollbar-width) ---------- */
+.results-list::-webkit-scrollbar{width:5px}
+.results-list::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:3px}
+.results-list::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- movimiento reducido ----------
+   el resto (rotación de la escena, tweens 3D) se corta desde script.js */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+  .grain{display:none}
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px){
+  /* related-panel se oculta acá — explore-panel recupera ese espacio */
+  .info-panel{width:calc(100vw - 48px)}
+  .explore-panel{width:calc(100vw - 48px);bottom:auto;max-height:min(42vh, 420px)}
+  .related-panel{display:none}
+}
+
+@media (max-width: 640px){
+  :root{--edge:14px}
+  .frame-bar span:last-child{display:none}
+  /* en móvil el masthead se reduce al wordmark para dejar sitio a los
+     controles; el eyebrow/tagline sólo aportan en pantalla grande */
+  .masthead{top:calc(var(--bar-h) + 10px);max-width:52vw}
+  .eyebrow,.tagline{display:none}
+  .wordmark{font-size:20px}
+  .top-actions{top:calc(var(--bar-h) + 10px)}
+  .icon-btn{font-size:9px;padding:7px 11px}
+  .legend-panel{top:calc(var(--bar-h) + 50px);right:var(--edge);left:var(--edge);width:auto}
+
+  /* no hay alto para dejar explore-panel bajo el masthead y sobre info-panel,
+     así que baja abajo (como layer-toggles) y layer-toggles sube. info-panel
+     se acota y hace scroll interno para no chocar con explore-panel
+     (rediseño mobile pendiente — ver README). */
+  .explore-panel{top:auto;bottom:calc(38vh + var(--edge));left:var(--edge);right:var(--edge);width:auto;max-height:30vh}
+  .info-panel{left:var(--edge);right:var(--edge);bottom:var(--edge);width:auto;max-height:36vh;overflow-y:auto}
+  .related-panel{display:none}
+  /* bajo el masthead/acciones, centrado */
+  .layer-toggles{bottom:auto;top:calc(var(--bar-h) + 44px);left:50%}
+  .layer-btn{padding:8px 14px}
+
+  .map-header{flex-wrap:wrap;gap:8px 20px;padding:12px var(--edge)}
+  .map-status{margin-left:0;order:3;width:100%}
+  .map-info-card{left:var(--edge);right:var(--edge);bottom:var(--edge);width:auto}
+  .map-legend-panel{left:var(--edge);right:var(--edge);width:auto}
+  .map-hint{display:none}
+
+  .poster-bar{flex-wrap:wrap;gap:10px 16px;padding:12px var(--edge)}
+  .poster-stage{padding:14px}
+}

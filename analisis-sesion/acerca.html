@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sobre el proyecto — Análisis de sesiones</title>
+  <meta name="description" content="Pipeline en Python para el análisis verbal y no verbal de sesiones grabadas (Senado TV, YouTube o video local).">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .frame-bar a{color:inherit;text-decoration:none;border-bottom:1px solid var(--line-soft)}
+    .frame-bar a:hover{border-color:var(--white)}
+    .intro{padding:104px 6vw 40px}
+    .intro .lead{white-space:normal;max-width:62ch}
+    .prose{grid-column:1/10;font-size:15px;line-height:1.6;color:var(--gray-1)}
+    .prose p{margin:0 0 16px}
+    .prose strong{color:var(--white);font-weight:500}
+    .prose a{color:var(--white)}
+    .prose code,.stages code{font-family:var(--font-mono);font-size:12px;color:var(--white)}
+    .prose ul{margin:0 0 16px;padding-left:18px}
+    .prose li{margin-bottom:6px}
+    .stages{grid-column:1/13;list-style:none;margin:0;padding:0;counter-reset:s}
+    .stages li{display:grid;grid-template-columns:48px 180px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--line-faint);font-size:14px;color:var(--gray-1);line-height:1.5}
+    .stages li::before{counter-increment:s;content:counter(s,decimal-leading-zero);font-family:var(--font-mono);font-size:11px;color:var(--gray-2);padding-top:2px}
+    .figure{grid-column:1/13;margin:0 0 24px}
+    .figure img{display:block;width:100%;height:auto;border:1px solid var(--line-soft)}
+    .figure figcaption{margin-top:10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-2)}
+    pre{grid-column:1/13;overflow-x:auto;margin:0 0 16px;padding:16px;border:1px solid var(--line-faint);font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--gray-1)}
+    @media (max-width:900px){
+      .prose{grid-column:1/13}
+      .stages li{grid-template-columns:36px 1fr}
+      .stages li span:last-child{grid-column:2}
+    }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="frame-bar">
+    <span><a href="../">MP — 2026</a></span>
+    <span><a href="./">Usar la herramienta</a></span>
+  </header>
+
+  <main>
+    <section class="intro">
+      <span class="eyebrow">Registro 007 — Laboratorio / Computación Avanzada</span>
+      <h1>Análisis verbal y no&nbsp;verbal de&nbsp;sesiones</h1>
+      <p class="lead">Pipeline en Python que toma la grabación de una sesión (Senado TV, YouTube o un video local) y entrega quién habla, qué dice, qué repite y cómo se expresa con el rostro, el cuerpo y la voz.</p>
+    </section>
+
+    <div class="page">
+
+      <section class="record reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 001</span>
+          <span class="record-title">Qué entrega</span>
+        </div>
+        <div class="record-body">
+          <div class="prose">
+            <ul>
+              <li><strong>Transcripción por orador</strong>, con nombre y marcas de tiempo.</li>
+              <li><strong>Análisis verbal</strong>: tiempo de palabra, palabras más repetidas, palabras distintivas de cada orador (keyness), frases que cada uno repite (“consignas”), marcadores retóricos y sentimiento del texto.</li>
+              <li><strong>Análisis no verbal</strong>: rostro (blendshapes de MediaPipe resumidos en índices legibles), orientación y movimiento de la cabeza, energía gestual de las manos, y voz (tono, volumen, velocidad y pausas).</li>
+              <li><strong>Línea de tiempo</strong> en tramos de ~20 s, en CSV.</li>
+              <li><strong>Reporte HTML</strong> que se abre con doble clic.</li>
+            </ul>
+            <p>La exportación a imágenes generativas todavía no está incluida: esta versión llega hasta los datos, que después se pueden conectar a ComfyUI o a MQTT.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="record reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 002</span>
+          <span class="record-title">Ejemplo</span>
+        </div>
+        <div class="record-body">
+          <figure class="figure">
+            <a href="docs/ejemplo/reporte.html"><img src="docs/ejemplo/reporte.png" alt="Captura del reporte HTML generado con una sesión sintética de prueba" loading="lazy"></a>
+            <figcaption>Reporte generado con una sesión sintética — no corresponde a una sesión real</figcaption>
+          </figure>
+          <ul class="links">
+            <li><a href="docs/ejemplo/reporte.html"><span><span class="idx">01</span>Reporte de ejemplo (HTML)</span><span class="arrow" aria-hidden="true">→</span></a></li>
+            <li><a href="docs/ejemplo/linea_tiempo.csv"><span><span class="idx">02</span>Línea de tiempo (CSV)</span><span class="arrow" aria-hidden="true">→</span></a></li>
+            <li><a href="docs/ejemplo/oradores.csv"><span><span class="idx">03</span>Tabla de oradores (CSV)</span><span class="arrow" aria-hidden="true">→</span></a></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="record reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 003</span>
+          <span class="record-title">Etapas</span>
+        </div>
+        <div class="record-body">
+          <ol class="stages">
+            <li><code>ingesta</code><span>Descarga y extracción de audio y video con ffmpeg.</span></li>
+            <li><code>transcripcion</code><span>faster-whisper con marcas de tiempo por palabra.</span></li>
+            <li><code>diarizacion</code><span>pyannote separa quién habla; turnos y ventanas de ~20 s.</span></li>
+            <li><code>oradores</code><span>Sugiere nombres a partir de frases como “Tiene la palabra el senador X”; se corrigen en <code>oradores.csv</code>.</span></li>
+            <li><code>verbal</code><span>Frecuencias, keyness, consignas, marcadores retóricos y sentimiento.</span></li>
+            <li><code>no_verbal</code><span>MediaPipe: rostro y pose.</span></li>
+            <li><code>prosodia</code><span>Voz con Praat (parselmouth).</span></li>
+            <li><code>linea_tiempo</code><span>Fusión de todo y puntajes z por orador.</span></li>
+            <li><code>reporte</code><span>Reporte HTML.</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="record reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 004</span>
+          <span class="record-title">Uso</span>
+        </div>
+        <div class="record-body">
+          <div class="prose">
+            <p>Hay dos formas de usarlo. La <a href="./">versión web</a> corre en el navegador con un video local, sin instalar nada. La versión Python completa corre en el computador (Python 3.10–3.12 + ffmpeg), acepta links de YouTube y usa pyannote para separar oradores. Instrucciones completas de instalación, token de Hugging Face y tiempos aproximados en el README.</p>
+          </div>
+<pre>git clone https://github.com/matias-pezoa/work.git
+cd work/analisis-sesion
+pip install -r requirements.txt
+python -m spacy download es_core_news_md
+
+python pipeline.py --sesion prueba --fuente "https://www.youtube.com/watch?v=XXXX" --desde 0:20:00 --hasta 0:30:00</pre>
+        </div>
+      </section>
+
+      <section class="record reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 005</span>
+          <span class="record-title">Limitaciones</span>
+        </div>
+        <div class="record-body">
+          <div class="prose">
+            <ul>
+              <li><strong>Planos de TV.</strong> El rostro en pantalla no siempre es el de quien habla; cada tramo indica si el rostro visible parece estar hablando, para filtrar.</li>
+              <li><strong>Rostro no es emoción.</strong> Los blendshapes describen movimientos musculares observables; inferir emociones a partir de la cara es un tema científicamente discutido (Barrett et al., 2019).</li>
+              <li><strong>Índices exploratorios.</strong> Carga retórica, activación vocal y corporal, y desfase verbal/no verbal son propuestas de lectura, no mediciones validadas.</li>
+              <li><strong>Datos personales.</strong> Aunque las sesiones son públicas, se procesan datos biométricos (rostro y voz) de personas identificables (Ley 21.719).</li>
+              <li><strong>Estado.</strong> Probado con una sesión sintética; Whisper, pyannote y MediaPipe aún deben probarse con una sesión real.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="record record-links reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 006</span>
+          <span class="record-title">Código</span>
+        </div>
+        <div class="record-body">
+          <ul class="links">
+            <li><a href="./"><span><span class="idx">00</span>Usar la versión web (en el navegador)</span><span class="arrow" aria-hidden="true">→</span></a></li>
+            <li><a href="https://github.com/matias-pezoa/work/tree/main/analisis-sesion" rel="noopener"><span><span class="idx">01</span>Código y README en GitHub</span><span class="arrow" aria-hidden="true">→</span></a></li>
+            <li><a href="https://github.com/matias-pezoa/work/blob/main/analisis-sesion/AI_USAGE.md" rel="noopener"><span><span class="idx">02</span>Registro de uso de IA</span><span class="arrow" aria-hidden="true">→</span></a></li>
+            <li><a href="../"><span><span class="idx">03</span>Volver al inicio</span><span class="arrow" aria-hidden="true">→</span></a></li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="archive-footer">
+    <span>Matías Pezoa — Computación Avanzada 2026</span>
+    <span>Licencia MIT</span>
+  </footer>
+
+  <script>
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.1 });
+      document.querySelectorAll('.record').forEach(function (r) { io.observe(r); });
+    } else {
+      document.querySelectorAll('.record').forEach(function (r) { r.classList.add('in-view'); });
+    }
+  </script>
+</body>
+</html>

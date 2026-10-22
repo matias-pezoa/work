@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Análisis de sesiones — Matías Pezoa</title>
+  <meta name="description" content="Análisis verbal y no verbal de una sesión grabada, directamente en el navegador: transcripción por orador, palabras repetidas, marcadores retóricos, voz, rostro y cuerpo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="web/app.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="frame-bar">
+    <span><a href="../">MP — 2026</a></span>
+    <span><a href="acerca.html">Sobre el proyecto</a></span>
+  </header>
+
+  <main class="app">
+    <section class="intro">
+      <span class="eyebrow">Registro 007 — Laboratorio / Computación Avanzada</span>
+      <h1>Análisis verbal y no&nbsp;verbal de&nbsp;sesiones</h1>
+      <p class="lead">Sube la grabación de una sesión y obtén quién habla, qué dice, qué palabras repite y cómo se expresa con la voz, el rostro y el cuerpo. Todo se procesa en tu computador: el video no se sube a ningún servidor.</p>
+    </section>
+
+    <!-- 1. CARGA -->
+    <section class="bloque" id="carga">
+      <div class="bloque-head"><span class="record-index">01</span><span class="record-title">Archivo</span></div>
+      <form id="form" class="bloque-body">
+        <label id="zona" class="zona">
+          <input id="archivo" type="file" accept="video/*,audio/*">
+          <span class="zona-t">Arrastra aquí un video o audio, o haz clic para elegirlo</span>
+          <span class="zona-s" id="nombre-archivo">Ningún archivo elegido</span>
+          <span class="zona-s">MP4, WebM, MOV, MP3, WAV… Para YouTube o Senado TV, descarga primero el video.</span>
+        </label>
+
+        <div class="opciones">
+          <label>Desde <input id="desde" placeholder="0:00" inputmode="numeric"></label>
+          <label>Hasta <input id="hasta" placeholder="final" inputmode="numeric"></label>
+          <label>Transcripción
+            <select id="modelo">
+              <option value="tiny">Rápida (Whisper tiny, ~150 MB)</option>
+              <option value="base" selected>Equilibrada (Whisper base, ~290 MB)</option>
+              <option value="small">Precisa (Whisper small, ~970 MB)</option>
+            </select>
+          </label>
+          <label class="check"><input id="separar" type="checkbox" checked> Separar oradores por voz</label>
+          <label>Oradores
+            <select id="n-oradores">
+              <option value="auto" selected>Detectar</option>
+              <option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option>
+            </select>
+          </label>
+          <label class="check"><input id="con-video" type="checkbox" checked> Analizar rostro y cuerpo</label>
+          <label>Cuadros por segundo
+            <select id="fps"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>
+          </label>
+        </div>
+
+        <p class="aviso" id="aviso-form" hidden role="alert"></p>
+        <div class="acciones">
+          <button type="submit" id="btn-analizar" class="btn">Analizar</button>
+          <button type="button" id="btn-cancelar" class="btn btn-sec" hidden>Cancelar</button>
+          <label class="btn btn-sec">Abrir sesión guardada (.json)<input id="cargar-sesion" type="file" accept=".json,application/json" hidden></label>
+        </div>
+        <p class="nota">La primera vez se descargan los modelos (entre 200 MB y 1 GB según la opción); después quedan guardados en el navegador. <span id="aviso-equipo"></span> Prueba primero con un tramo de 5–10 minutos: una hora completa puede tardar bastante sin tarjeta gráfica.</p>
+      </form>
+    </section>
+
+    <!-- 2. PROGRESO -->
+    <section class="bloque" id="progreso" hidden>
+      <div class="bloque-head"><span class="record-index">02</span><span class="record-title">Proceso</span></div>
+      <div class="bloque-body">
+        <ol id="etapas" class="etapas">
+          <li data-etapa="audio"><span class="nom">Extraer audio</span><span class="barra-av"><i></i></span><span class="det"></span></li>
+          <li data-etapa="transcripcion"><span class="nom">Transcribir (Whisper)</span><span class="barra-av"><i></i></span><span class="det"></span></li>
+          <li data-etapa="oradores"><span class="nom">Separar oradores (huellas de voz)</span><span class="barra-av"><i></i></span><span class="det"></span></li>
+          <li data-etapa="voz"><span class="nom">Voz: tono y volumen</span><span class="barra-av"><i></i></span><span class="det"></span></li>
+          <li data-etapa="video"><span class="nom">Rostro y cuerpo (MediaPipe)</span><span class="barra-av"><i></i></span><span class="det"></span></li>
+          <li data-etapa="reporte"><span class="nom">Reporte</span><span class="barra-av"><i></i></span><span class="det"></span></li>
+        </ol>
+        <details><summary>Registro</summary><pre id="log" class="log"></pre></details>
+      </div>
+    </section>
+
+    <!-- 3. RESULTADOS -->
+    <div id="resultados" hidden>
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">03</span><span class="record-title">Resumen</span></div>
+        <div class="bloque-body">
+          <h2 id="titulo-sesion" class="titulo-sesion"></h2>
+          <div id="kpis" class="kpis"></div>
+          <video id="reproductor" class="reproductor" controls playsinline hidden></video>
+          <p id="sin-medio" class="nota" hidden>Sesión abierta desde un archivo guardado. Para poder reproducir los tramos, <label class="enlace">elige el video original<input id="asociar-medio" type="file" accept="video/*,audio/*" hidden></label>.</p>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">04</span><span class="record-title">Oradores</span></div>
+        <div class="bloque-body">
+          <p class="nota">La separación por voz entrega hablantes anónimos. Los nombres se sugieren a partir de frases como «Tiene la palabra el senador X». Escucha cada uno y escribe o corrige el nombre: el reporte se actualiza al instante. Si dos ids son la misma persona, dales el mismo nombre y se juntan.</p>
+          <label class="inline">Número de oradores
+            <select id="k-oradores">
+              <option value="auto">Detectar</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>10</option><option>12</option>
+            </select>
+          </label>
+          <div class="tabla-scroll">
+            <table id="tabla-oradores">
+              <thead><tr><th>Id</th><th>Nombre</th><th class="num">Tiempo</th><th class="num">Turnos</th><th>Muestra y evidencia</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">05</span><span class="record-title">Tiempo de palabra</span></div>
+        <div class="bloque-body"><div id="tiempo-palabra"></div></div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">06</span><span class="record-title">Línea de tiempo</span></div>
+        <div class="bloque-body">
+          <label class="inline">Mostrar <select id="metrica"></select></label>
+          <p class="nota" id="metrica-ayuda"></p>
+          <div id="leyenda" class="leyenda"></div>
+          <div class="grafico-caja">
+            <svg id="grafico" class="grafico" role="img" aria-label="Línea de tiempo por tramos de ~20 segundos"></svg>
+            <div id="tip" class="tip" hidden></div>
+          </div>
+          <details><summary>Ver como tabla</summary><div id="tabla-linea" class="tabla-scroll"></div></details>
+          <p class="nota">Los índices compuestos son propuestas de lectura exploratorias, no mediciones validadas. Pasa el cursor por un tramo para ver su texto; haz clic para reproducirlo.</p>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">07</span><span class="record-title">Marcadores retóricos</span></div>
+        <div class="bloque-body">
+          <p class="nota">Apariciones por cada 1.000 palabras de cada orador. Los léxicos son una operacionalización de autor (ver <a href="https://github.com/matias-pezoa/work/blob/main/analisis-sesion/etapas/lexicos.py" rel="noopener">lexicos.py</a>): un valor alto vuelve visible un rasgo del discurso, no prueba una intención.</p>
+          <div id="tabla-marcadores" class="tabla-scroll"></div>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">08</span><span class="record-title">Fichas por orador</span></div>
+        <div class="bloque-body"><div id="fichas" class="fichas"></div></div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">09</span><span class="record-title">Transcripción</span></div>
+        <div class="bloque-body">
+          <label class="inline">Buscar <input id="buscar" type="search" placeholder="palabra o frase"></label>
+          <div id="transcripcion" class="transcripcion"></div>
+        </div>
+      </section>
+
+      <section class="bloque">
+        <div class="bloque-head"><span class="record-index">10</span><span class="record-title">Descargas</span></div>
+        <div class="bloque-body">
+          <ul class="links">
+            <li><a href="#" data-descarga="sesion" onclick="return false"><span><span class="idx">01</span>Sesión completa (.json) — para volver a abrirla sin reprocesar</span><span class="arrow" aria-hidden="true">↓</span></a></li>
+            <li><a href="#" data-descarga="linea" onclick="return false"><span><span class="idx">02</span>Línea de tiempo (.csv)</span><span class="arrow" aria-hidden="true">↓</span></a></li>
+            <li><a href="#" data-descarga="oradores" onclick="return false"><span><span class="idx">03</span>Oradores (.csv)</span><span class="arrow" aria-hidden="true">↓</span></a></li>
+            <li><a href="#" data-descarga="transcripcion" onclick="return false"><span><span class="idx">04</span>Transcripción por orador (.txt)</span><span class="arrow" aria-hidden="true">↓</span></a></li>
+            <li><a href="#" data-descarga="verbal" onclick="return false"><span><span class="idx">05</span>Análisis verbal (.json)</span><span class="arrow" aria-hidden="true">↓</span></a></li>
+            <li><a href="#" data-descarga="cuadros" onclick="return false"><span><span class="idx">06</span>Rostro y cuerpo cuadro a cuadro (.csv)</span><span class="arrow" aria-hidden="true">↓</span></a></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <section class="bloque">
+      <div class="bloque-head"><span class="record-index">—</span><span class="record-title">Límites de la versión web</span></div>
+      <div class="bloque-body">
+        <ul class="nota lista">
+          <li>No descarga desde YouTube ni Senado TV: el navegador no lo permite. Descarga el video y súbelo.</li>
+          <li>La separación de oradores usa las mismas huellas de voz que pyannote (WeSpeaker), pero con un agrupamiento más simple: revisa el resultado, ajusta el número de oradores y corrige los nombres.</li>
+          <li>No hay lematización ni análisis de sentimiento (sí en la <a href="acerca.html">versión Python</a>).</li>
+          <li>En TV, el rostro en pantalla no siempre es el de quien habla. Solo se usan los tramos donde la boca visible se mueve.</li>
+          <li>Rostro no es emoción: los valores describen movimientos musculares observables.</li>
+          <li>Se procesan datos biométricos de personas identificables: revisa la Ley 21.719 antes de publicar resultados.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="archive-footer">
+    <span>Matías Pezoa — Computación Avanzada 2026</span>
+    <span>Whisper · WeSpeaker · MediaPipe — en el navegador</span>
+  </footer>
+
+  <script type="module" src="web/app.js"></script>
+</body>
+</html>

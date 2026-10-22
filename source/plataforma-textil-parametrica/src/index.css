@@ -1,0 +1,34 @@
+:root {
+  --bg: #141518;
+  --panel: #1c1e23;
+  --panel-2: #23262d;
+  --line: #33373f;
+  --text: #e7e9ee;
+  --muted: #9aa0ac;
+  --accent: #4f7cff;
+  --accent-warm: #ffd166;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    13px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

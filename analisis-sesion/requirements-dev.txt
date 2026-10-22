@@ -1,0 +1,8 @@
+# Para correr las pruebas (tests/) sin GPU ni modelos de IA pesados
+numpy
+soundfile
+praat-parselmouth
+spacy
+pytest
+# y el modelo de español:
+#   python -m spacy download es_core_news_md

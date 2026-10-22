@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VRTG SCENT — Atlas morfológico de perfumes</title>
+  <meta name="description" content="Cartografía 3D generativa de perfiles olfativos, construida a partir de datos reales de perfumes." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Oswald:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="frame-bar">
+    <div class="frame-bar-left">
+      <span>MP — 2026</span>
+      <nav class="frame-nav">
+        <a href="../index.html" class="frame-nav-btn">Inicio</a>
+        <button type="button" class="frame-nav-btn" onclick="history.back()">Atrás</button>
+      </nav>
+    </div>
+    <span>Ejercicio 02 · Computación Avanzada</span>
+  </header>
+
+  <div id="scene-root" role="img"
+       aria-label="Composición 3D del perfil olfativo del perfume seleccionado. Usa el panel de la derecha para explorar la lista."></div>
+  <div id="tooltip" class="tooltip" hidden></div>
+
+  <div id="loading" class="loading">
+    <p>VRTG SCENT</p>
+    <p class="loading-sub">cargando el atlas</p>
+  </div>
+
+  <header class="masthead">
+    <span class="eyebrow">Registro 001 — Computación Avanzada / MCD UAI</span>
+    <h1 class="wordmark">VRTG SCENT</h1>
+    <p class="tagline">atlas morfológico de perfiles olfativos</p>
+  </header>
+
+  <div class="top-actions">
+    <button id="map-toggle" class="icon-btn" type="button" aria-expanded="false" aria-controls="map-panel">
+      mapa de notas
+    </button>
+    <button id="poster-toggle" class="icon-btn" type="button" aria-expanded="false" aria-controls="poster-panel">
+      infografía
+    </button>
+    <button id="legend-toggle" class="icon-btn" type="button" aria-expanded="false" aria-controls="legend-panel">
+      ¿cómo leer esto?
+    </button>
+  </div>
+
+  <section id="legend-panel" class="panel legend-panel" hidden>
+    <h2>dato → regla → forma</h2>
+    <dl>
+      <dt>cada nota olfativa</dt>
+      <dd>un elemento propio en la composición. Su <strong>forma</strong> (blob, cromo, pompón, concreto o vidrio) la fija la categoría de la nota — cítrico, floral, madera, almizcle…; si no calza con ninguna, un hash de su nombre</dd>
+
+      <dt>color del elemento</dt>
+      <dd>identidad de la nota: la misma nota es siempre el mismo color, en cualquier perfume. Así dos composiciones que comparten notas se leen parecidas de un vistazo</dd>
+
+      <dt>sector donde aparece la nota</dt>
+      <dd>por categoría olfativa: los cítricos siempre caen hacia un lado, las maderas hacia otro… la <strong>silueta de la nube</strong> ya cuenta el balance del perfume</dd>
+
+      <dt>salida / corazón / fondo</dt>
+      <dd>altura: periferia superior · anillo medio · núcleo inferior, ancladas a la columna central por un tendón. Se muestran hasta 9 notas por capa</dd>
+
+      <dt>familia olfativa</dt>
+      <dd>color y material de la <strong>columna central</strong> (metalness / roughness / clearcoat)</dd>
+
+      <dt>año</dt>
+      <dd>profundidad Z del conjunto + marcador sobre la línea temporal de la escena</dd>
+
+      <dt>rate / nº de valoraciones</dt>
+      <dd>escala global de los elementos. Ojo: sólo ~1 de cada 10 perfumes tiene valoración; en el resto este canal no varía</dd>
+    </dl>
+    <p class="legend-note">Forma, color y sector de cada nota son fijos: la misma nota genera el mismo elemento en el mismo lugar relativo, en cualquier perfume. Cada perfume combina un conjunto distinto de notas, así que cada composición es única. <strong>La cámara se reencuadra en cada selección</strong>, por lo que el tamaño absoluto no es comparable entre perfumes — sí lo son la forma, el color y la disposición.</p>
+  </section>
+
+  <section class="panel explore-panel" aria-label="explorar perfumes">
+    <div class="explore-header">
+      <label for="search-input" class="sr-only">buscar por nombre o marca</label>
+      <input id="search-input" type="search" placeholder="buscar por nombre o marca…" autocomplete="off" />
+    </div>
+
+    <div class="explore-filters">
+      <label for="family-filter" class="sr-only">filtrar por familia olfativa</label>
+      <select id="family-filter">
+        <option value="">todas las familias</option>
+      </select>
+      <div class="year-range">
+        <label for="year-min" class="sr-only">año desde</label>
+        <input id="year-min" type="number" inputmode="numeric" />
+        <span aria-hidden="true">—</span>
+        <label for="year-max" class="sr-only">año hasta</label>
+        <input id="year-max" type="number" inputmode="numeric" />
+      </div>
+    </div>
+
+    <p id="results-count" class="results-count" aria-live="polite">—</p>
+    <ul id="results-list" class="results-list"></ul>
+  </section>
+
+  <aside id="info-panel" class="panel info-panel" aria-live="polite">
+    <p class="info-label">perfume<span class="info-cat" id="info-cat"></span></p>
+    <h2 id="info-name">—</h2>
+    <p class="info-label">marca</p>
+    <p id="info-brand" class="info-value">—</p>
+    <div class="info-row">
+      <div>
+        <p class="info-label">año</p>
+        <p id="info-year" class="info-value">—</p>
+      </div>
+      <div>
+        <p class="info-label">familia</p>
+        <p id="info-family" class="info-value">—</p>
+      </div>
+    </div>
+    <div class="info-row">
+      <div>
+        <p class="info-label">precio ref.</p>
+        <p id="info-price" class="info-value">—</p>
+      </div>
+      <div>
+        <p class="info-label">para / concentración</p>
+        <p id="info-gender" class="info-value">—</p>
+      </div>
+    </div>
+
+    <div class="note-block">
+      <p class="info-label note-top">notas de salida</p>
+      <p id="info-top" class="note-list">—</p>
+    </div>
+    <div class="note-block">
+      <p class="info-label note-middle">notas de corazón</p>
+      <p id="info-middle" class="note-list">—</p>
+    </div>
+    <div class="note-block">
+      <p class="info-label note-base">notas de fondo</p>
+      <p id="info-base" class="note-list">—</p>
+    </div>
+
+    <div class="rating-row">
+      <span id="info-rate">sin calificación</span>
+    </div>
+  </aside>
+
+  <div id="layer-toggles" class="layer-toggles" role="group" aria-label="capas visibles de la composición">
+    <button type="button" class="layer-btn note-top active" data-layer="top" aria-pressed="true">SALIDA</button>
+    <button type="button" class="layer-btn note-middle active" data-layer="middle" aria-pressed="true">CORAZÓN</button>
+    <button type="button" class="layer-btn note-base active" data-layer="base" aria-pressed="true">FONDO</button>
+  </div>
+
+  <section id="related-panel" class="panel related-panel">
+    <p class="info-label">perfumes relacionados</p>
+    <ul id="related-list" class="related-list"></ul>
+  </section>
+
+  <section id="map-panel" class="map-panel" hidden>
+    <header class="map-header">
+      <button id="map-back" class="icon-btn" type="button" hidden>‹ volver</button>
+      <div class="map-header-title">
+        <span class="info-label">perfumes relacionados con</span>
+        <p id="map-focus-name" class="map-focus-name">—</p>
+      </div>
+      <span id="map-status" class="map-status">—</span>
+      <button id="map-legend-toggle" class="icon-btn" type="button" aria-expanded="false" aria-controls="map-legend-panel">leyenda</button>
+      <button id="map-close" class="icon-btn" type="button">cerrar ✕</button>
+    </header>
+
+    <div id="map-root" class="map-root"></div>
+
+    <section id="map-legend-panel" class="panel map-legend-panel" hidden>
+      <h2>forma / color → qué significa</h2>
+      <dl>
+        <div class="legend-row">
+          <canvas class="legend-preview" id="legend-preview-blob"></canvas>
+          <div><dt>blob glossy</dt><dd>floral o frutal</dd></div>
+        </div>
+
+        <div class="legend-row">
+          <canvas class="legend-preview" id="legend-preview-glass"></canvas>
+          <div><dt>vidrio translúcido</dt><dd>cítrico, ámbar o gourmand</dd></div>
+        </div>
+
+        <div class="legend-row">
+          <canvas class="legend-preview" id="legend-preview-concrete"></canvas>
+          <div><dt>bloque de concreto</dt><dd>madera, resina oscura, especia o ahumado</dd></div>
+        </div>
+
+        <div class="legend-row">
+          <canvas class="legend-preview" id="legend-preview-fuzz"></canvas>
+          <div><dt>pompón / fuzz</dt><dd>almizcle, verde o herbal</dd></div>
+        </div>
+
+        <div class="legend-row">
+          <canvas class="legend-preview" id="legend-preview-chrome"></canvas>
+          <div><dt>cromo</dt><dd>acuático, metálico u ozónico</dd></div>
+        </div>
+      </dl>
+      <p class="legend-note">
+        El perfume <strong>foco</strong> va al centro. La <strong>distancia</strong> al centro es la afinidad de composición: una nota compartida pesa más si cae en la <strong>misma capa</strong> (salida / corazón / fondo) en ambos perfumes (anillos guía). El <strong>grosor del rayo</strong>, en cambio, es el nº crudo de notas en común — un rayo grueso pero lejano comparte muchas notas mal alineadas; uno fino y cercano, pocas notas muy alineadas. Los grupos se ordenan por su <strong>nota puente</strong>, rotulada en el borde. Color de cada forma = identidad de la nota · forma = su categoría olfativa.
+      </p>
+    </section>
+
+    <aside id="map-info-card" class="panel map-info-card" hidden>
+      <p class="info-label">perfume</p>
+      <p id="map-info-name" class="map-info-name">—</p>
+      <p id="map-info-meta" class="info-value">—</p>
+      <div class="note-block">
+        <p class="info-label">notas en común con el foco</p>
+        <p id="map-info-shared" class="note-list">—</p>
+      </div>
+      <button id="map-view-composition" class="icon-btn map-view-btn" type="button">ver composición 3D →</button>
+    </aside>
+
+    <p class="map-hint">click: ficha · doble-click: re-centrar en ese perfume · rueda: zoom · arrastrar: desplazar</p>
+  </section>
+
+  <section id="poster-panel" class="poster-panel" hidden>
+    <header class="poster-bar">
+      <div class="poster-bar-title">
+        <span class="info-label">lámina — vecindario olfativo</span>
+        <p id="poster-focus" class="map-focus-name">—</p>
+      </div>
+      <div class="poster-actions">
+        <div class="export-menu">
+          <button id="export-toggle" class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false">exportar como ▾</button>
+          <div id="export-list" class="export-list" role="menu" hidden>
+            <button type="button" data-fmt="svg" role="menuitem">SVG · vectorial</button>
+            <button type="button" data-fmt="png" role="menuitem">PNG · 2000 px</button>
+          </div>
+        </div>
+        <button id="poster-close" class="icon-btn" type="button">cerrar ✕</button>
+      </div>
+    </header>
+    <div id="poster-stage" class="poster-stage"></div>
+  </section>
+
+  <!-- versiones fijadas de forma exacta: un proyecto archivado no debe romperse
+       si el CDN publica una versión nueva con cambios incompatibles -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+        "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm"
+      }
+    }
+  </script>
+
+  <script type="module" src="./script.js"></script>
+</body>
+</html>

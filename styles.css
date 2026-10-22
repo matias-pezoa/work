@@ -1,0 +1,482 @@
+/* ============================================================
+   COMPUTACIÓN AVANZADA — 2026
+   Lenguaje visual: archivo científico / documentación técnica.
+   Sistema reducido a cinco recursos: imagen, marco, línea, dato, vacío.
+   ============================================================ */
+
+:root{
+  --black:#060606;
+  --white:#f4f4f1;
+  --gray-1:#c7c7c2;
+  --gray-2:#8c8c87;
+  --gray-3:#4a4a46;
+  --line:rgba(244,244,241,.82);
+  --line-soft:rgba(244,244,241,.28);
+  --line-faint:rgba(244,244,241,.14);
+
+  --font-display:"Oswald","Arial Narrow",Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+
+  --bar-h:34px;
+}
+
+*{box-sizing:border-box}
+
+html{background:var(--black);overflow-x:hidden}
+
+body{
+  margin:0;
+  background:var(--black);
+  color:var(--white);
+  font-family:var(--font-body);
+  padding-top:var(--bar-h);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+::selection{background:var(--white);color:var(--black)}
+
+/* ---------- texture: fine grain, near-invisible ---------- */
+.grain{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  pointer-events:none;
+  opacity:.05;
+  mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* ---------- custom cursor: inverting observation frame ---------- */
+.cursor{
+  position:fixed;
+  top:0;left:0;
+  width:88px;height:88px;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  z-index:1001;
+  border:1px solid #fff;
+  background:#fff;
+  mix-blend-mode:difference;
+  display:none;
+}
+body.cursor-active{cursor:none}
+body.cursor-active .cursor{display:block}
+
+/* ---------- fixed frame bar ---------- */
+.frame-bar{
+  position:fixed;
+  top:0;left:0;right:0;
+  height:var(--bar-h);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+  border-bottom:1px solid var(--line-soft);
+  background:var(--black);
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--gray-1);
+  z-index:900;
+}
+
+/* ============================================================
+   OBSERVATION SYSTEM — main + markers + magnified crops + lines
+   ============================================================ */
+.obs{position:relative}
+
+.obs-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.obs-lines path{
+  fill:none;
+  stroke:var(--line);
+  stroke-width:1;
+  vector-effect:non-scaling-stroke;
+}
+
+.obs-frame{
+  position:absolute;
+  border:1px solid var(--line);
+  background:var(--black);
+}
+.obs-frame img,.obs-frame .obs-crop-media{
+  display:block;
+  width:100%;height:100%;
+  object-fit:cover;
+  filter:grayscale(1) contrast(1.18) brightness(.97);
+  background-repeat:no-repeat;
+}
+
+.obs-marker{
+  position:absolute;
+  border:1px solid var(--line);
+}
+.obs-marker span{
+  position:absolute;
+  top:-14px;left:-1px;
+  font-family:var(--font-mono);
+  font-size:9px;
+  letter-spacing:.06em;
+  color:var(--gray-1);
+}
+
+.obs-meta{
+  position:absolute;
+  left:0;right:0;
+  bottom:-20px;
+  display:flex;
+  justify-content:space-between;
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.03em;
+  color:var(--gray-2);
+  white-space:nowrap;
+}
+.obs-meta .ref{color:var(--gray-1)}
+
+/* ---------- hero specimen ---------- */
+.specimen-heading{
+  position:relative;
+  z-index:2;
+  padding:104px 6vw 0;
+}
+.eyebrow{
+  display:block;
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  margin:0 0 18px;
+}
+h1{
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:clamp(40px,6.2vw,84px);
+  letter-spacing:-.01em;
+  line-height:.98;
+  text-transform:uppercase;
+  margin:0 0 16px;
+}
+.lead{
+  max-width:none;
+  white-space:nowrap;
+  font-size:15px;
+  line-height:1.5;
+  color:var(--gray-1);
+  margin:0;
+}
+
+.specimen-field{
+  --field-h:clamp(560px,76vh,780px);
+  position:relative;
+  width:100%;
+  height:var(--field-h);
+  margin-top:36px;
+  padding:0 6vw 80px;
+}
+.specimen-field .obs-frame{position:absolute}
+
+/* Los tamaños de las ampliaciones se calculan a partir de la altura
+   real del campo (no del ancho): así nunca exceden el marco, sin
+   importar cuán ancha sea la ventana. */
+.obs-main{left:8%;top:4%;width:calc(var(--field-h) * .54);aspect-ratio:1/1;z-index:2}
+.marker-1{top:10%;left:22%;width:44%;height:26%}
+.marker-2{top:56%;left:16%;width:58%;height:32%}
+
+.crop-1{left:46%;top:0%;width:calc(var(--field-h) * .49);aspect-ratio:1/1}
+.crop-2{left:63%;top:44%;width:calc(var(--field-h) * .56);aspect-ratio:1/1}
+
+.crop-1 .obs-crop-media{background-image:var(--img);background-size:250%;background-position:56% 30%}
+.crop-2 .obs-crop-media{background-image:var(--img);background-size:220%;background-position:48% 82%}
+
+/* ============================================================
+   RECORD SECTIONS
+   ============================================================ */
+.page{
+  padding:0 6vw 140px;
+}
+
+/* Cada registro es una franja de dos zonas: una etiqueta de margen
+   fija (sticky) y un campo de contenido que usa el ancho disponible. */
+.record{
+  position:relative;
+  display:grid;
+  grid-template-columns:min(16vw,240px) 1fr;
+  column-gap:5vw;
+  padding-top:120px;
+  border-top:1px solid var(--line-faint);
+}
+.record:first-child{border-top:none}
+
+.record-head{
+  position:sticky;
+  top:calc(var(--bar-h) + 40px);
+  align-self:start;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.record-index{
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:.1em;
+  color:var(--gray-2);
+}
+.record-title{
+  font-family:var(--font-display);
+  font-weight:500;
+  font-size:13px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--gray-1);
+}
+.record-title::before{content:"— "}
+
+.record-body{
+  display:grid;
+  grid-template-columns:repeat(12,1fr);
+  column-gap:24px;
+}
+
+/* Perfil */
+.record-perfil dl{
+  grid-column:1/10;
+  margin:0;
+}
+.record-perfil dt{
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  margin-top:32px;
+  padding-top:10px;
+  border-top:1px solid var(--line-faint);
+}
+.record-perfil dt:first-child{margin-top:0;border-top:none;padding-top:0}
+.record-perfil dd{
+  margin:8px 0 0;
+  font-size:17px;
+  line-height:1.55;
+  color:var(--white);
+  max-width:64ch;
+}
+
+/* Intereses */
+.tags{list-style:none;margin:0;padding:0;grid-column:1/13;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));column-gap:24px}
+.tags li{
+  display:flex;
+  align-items:baseline;
+  gap:14px;
+  padding:12px 0;
+  border-bottom:1px solid var(--line-faint);
+  font-size:15px;
+  transition:background-color .15s linear,color .15s linear;
+}
+.tags li .idx{font-family:var(--font-mono);font-size:10px;color:var(--gray-2)}
+.tags li:hover{background:var(--white);color:var(--black)}
+.tags li:hover .idx{color:var(--black)}
+
+/* Pregunta */
+.record-pregunta .record-body{display:block}
+.pull{
+  font-family:var(--font-display);
+  font-weight:400;
+  font-size:clamp(22px,3.1vw,36px);
+  line-height:1.3;
+  letter-spacing:0;
+  max-width:22ch;
+  margin:0 0 0 8vw;
+  text-transform:none;
+}
+.pull-mark{
+  display:block;
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:.1em;
+  color:var(--gray-2);
+  margin:0 0 20px 8vw;
+}
+
+/* Inspiración */
+.record-inspiracion p{
+  grid-column:1/6;
+  font-size:16px;
+  line-height:1.6;
+  color:var(--gray-1);
+  margin:0;
+}
+.record-inspiracion .obs{
+  grid-column:7/13;
+  height:clamp(340px,42vw,480px);
+}
+.insp-main{left:0;top:0;width:62%;height:100%}
+.insp-marker{top:14%;left:20%;width:50%;height:34%}
+.insp-crop{left:66%;top:30%;width:34%;aspect-ratio:1/1}
+.insp-crop .obs-crop-media{background-image:var(--img);background-size:240%;background-position:50% 20%}
+
+/* Modelo 3D */
+.record-modelo .obs-frame.model-frame{
+  position:relative;
+  grid-column:1/13;
+  border:1px solid var(--line);
+  padding:0;
+}
+.model-frame .model{width:100%;height:460px;--poster-color:transparent;display:block;filter:grayscale(1) contrast(1.05)}
+.model-frame .obs-meta{position:relative;left:auto;right:auto;bottom:auto;padding:10px 16px;border-top:1px solid var(--line-faint);margin:0}
+
+/* Links */
+.links{list-style:none;margin:0;padding:0;grid-column:1/10}
+.links li{border-bottom:1px solid var(--line-faint)}
+.links a{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:18px 0;
+  font-family:var(--font-display);
+  font-size:18px;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  color:var(--white);
+  text-decoration:none;
+  transition:padding-left .15s linear;
+}
+.links a .idx{font-family:var(--font-mono);font-size:11px;color:var(--gray-2);margin-right:16px}
+.links a .arrow{color:var(--gray-2);font-family:var(--font-mono)}
+.links a:hover{padding-left:10px}
+.links a:hover .arrow{color:var(--white)}
+
+/* Work — índice de trabajos: fila con número, título, descripción y ficha */
+.work-filter{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
+.work-filter button{
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  background:none;
+  border:1px solid var(--line-faint);
+  padding:5px 9px;
+  cursor:pointer;
+  transition:background-color .15s linear,color .15s linear;
+}
+.work-filter button:hover{color:var(--white);border-color:var(--line-soft)}
+.work-filter button[aria-pressed="true"]{background:var(--white);color:var(--black);border-color:var(--white)}
+
+.works{list-style:none;margin:0;padding:0;grid-column:1/13;border-top:1px solid var(--line-faint)}
+.works li{border-bottom:1px solid var(--line-faint)}
+.works a{
+  display:grid;
+  grid-template-columns:40px minmax(0,1.1fr) minmax(0,1.4fr) auto 24px;
+  align-items:baseline;
+  column-gap:24px;
+  padding:22px 0;
+  color:var(--white);
+  text-decoration:none;
+  transition:padding-left .15s linear,background-color .15s linear,color .15s linear;
+}
+.works .idx{font-family:var(--font-mono);font-size:11px;color:var(--gray-2)}
+.works .work-title{
+  font-family:var(--font-display);
+  font-size:clamp(18px,1.9vw,24px);
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  line-height:1.15;
+}
+.works .work-desc{font-size:14px;line-height:1.5;color:var(--gray-1)}
+.works .work-meta{
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+  white-space:nowrap;
+}
+.works .arrow{color:var(--gray-2);font-family:var(--font-mono);text-align:right}
+.works a:hover{padding-left:10px;background:var(--white);color:var(--black)}
+.works a:hover .idx,
+.works a:hover .work-desc,
+.works a:hover .work-meta,
+.works a:hover .arrow{color:var(--black)}
+
+a{color:inherit}
+a:focus-visible{outline:1px solid var(--white);outline-offset:3px}
+
+/* ---------- footer ---------- */
+.archive-footer{
+  border-top:1px solid var(--line-soft);
+  padding:20px 6vw 40px;
+  display:flex;
+  justify-content:space-between;
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--gray-2);
+}
+
+/* ---------- scroll reveal ---------- */
+.record{clip-path:inset(0 0 0 0);}
+.record.reveal{
+  opacity:0;
+  transform:translateY(10px);
+  transition:opacity .4s linear,transform .4s linear;
+}
+.record.reveal.in-view{opacity:1;transform:translateY(0)}
+
+@media (prefers-reduced-motion:reduce){
+  .record.reveal{opacity:1;transform:none;transition:none}
+  .obs-lines path{transition:none !important;stroke-dashoffset:0 !important}
+}
+
+/* ============================================================
+   RESPONSIVE — below 900px the observation system collapses
+   into a stacked archive strip: no absolute positioning,
+   no connector lines, frames simply stack in flow.
+   ============================================================ */
+@media (max-width:900px){
+  .record{display:block;column-gap:0;padding-top:80px}
+  .record-head{
+    position:static;
+    top:auto;
+    flex-direction:row;
+    align-items:baseline;
+    gap:18px;
+    margin-bottom:40px;
+  }
+
+  .specimen-heading{padding:88px 6vw 0}
+  .lead{white-space:normal}
+  .specimen-field{height:auto;padding:0 6vw 60px;display:flex;flex-direction:column;gap:56px}
+  .specimen-field .obs-frame{position:static;width:100%;aspect-ratio:1/1}
+  .obs-lines{display:none}
+  .obs-marker{display:none}
+  .obs-meta{position:static;bottom:auto;margin-top:10px}
+
+  .record-perfil dl{grid-column:1/13}
+  .tags{grid-template-columns:1fr}
+  .pull,.pull-mark{margin-left:0}
+
+  .record-inspiracion p{grid-column:1/13;margin-bottom:36px}
+  .record-inspiracion .obs{grid-column:1/13;height:auto;display:flex;flex-direction:column;gap:56px}
+  .insp-main,.insp-crop{position:static;width:100%;aspect-ratio:1/1}
+
+  .links{grid-column:1/13}
+  .record-work .record-head{flex-wrap:wrap}
+  .record-head .work-filter{margin-top:0;margin-left:auto}
+  .works a{grid-template-columns:32px 1fr 20px;row-gap:6px}
+  .works .work-title{grid-column:2}
+  .works .arrow{grid-column:3;grid-row:1}
+  .works .work-desc,
+  .works .work-meta{grid-column:2}
+}
+
+@media (max-width:600px){
+  .record{padding-top:80px}
+  .record-body{row-gap:20px}
+  h1{font-size:clamp(34px,11vw,52px)}
+  .frame-bar span:last-child{display:none}
+}

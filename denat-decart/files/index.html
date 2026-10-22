@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Desnaturalización IA · Decart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1" />
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"></div>
+
+  <header class="frame-bar">
+    <a class="home-link" href="../../index.html">← Índice</a>
+    <span>Desnaturalización IA — deformación guiada por sensores (Decart)</span>
+  </header>
+
+  <!-- Escenario: el video transformado ocupa toda la pantalla disponible entre las dos barras -->
+  <div class="stage-full">
+    <!-- video-cam: feed crudo de la cámara (fuente para Decart). Oculto. -->
+    <video id="video-cam" autoplay muted playsinline></video>
+    <!-- video-out: lo que se ve. En modo Decart = stream transformado;
+         en modo simulación = el feed crudo espejado (clase .espejo). -->
+    <video id="video-out" class="espejo" autoplay muted playsinline></video>
+
+    <!-- Título: ocupa el centro hasta que hay una fuente de video activa
+         (ver dibujarEstadoTitulo en main.js). -->
+    <div class="stage-title" id="stage-title">
+      <span class="stage-title-eyebrow">MCD 2026</span>
+      <h1>Deformación afectiva del cuerpo</h1>
+      <p>Activa 02 · Cámara, conecta los sensores (01) y Decart (03), o usa el modo demostración</p>
+    </div>
+
+    <!-- Firma del sistema: esquina inferior derecha. -->
+    <div class="stage-caption" aria-hidden="true">
+      <span>DESNATURALIZACIÓN IA</span>
+      <span>SENSORES → TRIANGULACIÓN AFECTIVA → PROMPT → DECART</span>
+    </div>
+
+    <!-- Data en vivo: texto fijo y discreto. Vector de movimiento completo
+         (magnitud + dirección), el punto afectivo, el estado y el prompt. -->
+    <div class="data-readout" aria-live="polite">
+      <div class="data-readout-line">
+        <span class="data-readout-item"><span class="data-readout-label">Mov</span><span id="stat-tilt-mag" class="data-readout-value">0°</span></span>
+        <span class="data-readout-item"><span class="data-readout-label">Dir</span><span id="stat-tilt-ang" class="data-readout-value">—</span></span>
+        <span class="data-readout-item"><span class="data-readout-label">Activ</span><span id="stat-activacion" class="data-readout-value">0.00</span></span>
+        <span class="data-readout-item"><span class="data-readout-label">Val</span><span id="stat-valencia" class="data-readout-value">0.00</span></span>
+        <span class="data-readout-item"><span class="data-readout-label">Color</span><span id="swatch-color" class="swatch"></span><span id="stat-color" class="data-readout-value">—</span></span>
+        <span class="data-readout-item"><span class="data-readout-label">Estado</span><span id="stat-estado" class="data-readout-value">—</span></span>
+      </div>
+      <div class="data-readout-line data-readout-regla">
+        <span id="stat-prompt">Sistema listo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menús desplegables: controlan el sistema sin ocupar espacio fijo sobre el video -->
+  <nav class="menu-dock" aria-label="Controles del sistema">
+
+    <div class="menu-item">
+      <button class="menu-trigger" type="button" data-target="panel-conexion" aria-expanded="false" aria-controls="panel-conexion">
+        <span><span class="num">01</span>Sensores</span>
+        <span id="trigger-estado-conexion" class="menu-trigger-estado">Desconectado</span>
+      </button>
+      <div class="menu-panel" id="panel-conexion" hidden>
+        <div class="grid">
+          <label>Host (sin protocolo)
+            <input id="in-host" type="text" placeholder="xxxxxxxx.emqxsl.com" autocomplete="off" />
+          </label>
+          <label>Puerto WSS
+            <input id="in-port" type="text" value="8084" autocomplete="off" />
+          </label>
+          <label>Usuario
+            <input id="in-user" type="text" placeholder="usuario-mqtt" autocomplete="off" />
+          </label>
+          <label>Contraseña
+            <input id="in-pass" type="password" placeholder="••••••••" autocomplete="off" />
+          </label>
+          <label class="wide">Topic a escuchar
+            <input id="in-topic" type="text" value="proyecto/2026/desnaturalizacion-ia/instrumento/+/estado" autocomplete="off" />
+          </label>
+        </div>
+        <div class="actions actions-col">
+          <button id="btn-connect">Conectar por MQTT</button>
+          <button id="btn-serial">Conectar por USB (sin MQTT)</button>
+          <button id="btn-demo-panel">Modo demostración</button>
+          <span id="estado-conexion" class="badge badge-off">Desconectado</span>
+        </div>
+        <p class="hint">Las credenciales no se guardan ni se suben al repositorio: se piden en pantalla cada vez (ver Anexo MQTT del curso). "Conectar por USB" lee directo del cable del ESP32 (Chrome o Edge, con el Monitor Serie de Arduino IDE cerrado). El instrumento ya emite la inclinación en los dos ejes con signo (X e Y, −90 a 90): acá se usa el rango completo del movimiento, no solo su magnitud.</p>
+      </div>
+    </div>
+
+    <!-- Fuente de video: botón directo que activa la cámara. -->
+    <div class="dock-block">
+      <button class="menu-trigger" id="btn-webcam" type="button">
+        <span><span class="num">02</span>Cámara</span>
+      </button>
+      <div class="fuente-extra">
+        <button type="button" id="btn-demo" class="btn-mini">Demo sensores</button>
+      </div>
+    </div>
+
+    <div class="menu-item">
+      <button class="menu-trigger" type="button" data-target="panel-decart" aria-expanded="false" aria-controls="panel-decart">
+        <span><span class="num">03</span>Decart</span>
+        <span id="trigger-estado-decart" class="menu-trigger-estado">Simulación</span>
+      </button>
+      <div class="menu-panel" id="panel-decart" hidden>
+        <div class="grid">
+          <label class="wide">API key de Decart
+            <input id="in-apikey" type="password" placeholder="pega tu key de platform.decart.ai" autocomplete="off" />
+          </label>
+          <label class="wide">Prompt base (escenario fijo)
+            <input id="in-prompt-base" type="text" value="video restyle de una persona frente a cámara, encuadre de retrato" autocomplete="off" />
+          </label>
+        </div>
+        <div class="actions actions-col">
+          <button id="btn-decart">Conectar Decart</button>
+          <span id="estado-decart" class="badge badge-off">Sin conectar (simulación)</span>
+        </div>
+        <p class="hint">Sin API key el sistema corre en <strong>modo simulación</strong>: muestra la cámara cruda y el prompt que <em>se enviaría</em> a Decart según los sensores, sin transformar la imagen. Con key conectada, el prompt se actualiza en vivo (máx. 1 cada 1,8 s) a partir del estado afectivo. El SDK se carga por CDN y nunca se probó de punta a punta — si la conexión falla, el error aparece en el registro y el sistema vuelve solo a simulación.</p>
+      </div>
+    </div>
+
+    <div class="menu-item">
+      <button class="menu-trigger" type="button" data-target="panel-log" aria-expanded="false" aria-controls="panel-log">
+        <span><span class="num">04</span>Registro</span>
+      </button>
+      <div class="menu-panel" id="panel-log" hidden>
+        <div id="log"></div>
+      </div>
+    </div>
+
+    <div class="dock-block">
+      <button class="menu-trigger" id="btn-capturar" type="button">
+        <span><span class="num">05</span>Captura</span>
+        <span id="capture-estado" class="menu-trigger-estado">Inactivo</span>
+      </button>
+
+      <div class="capture-progreso-mini" id="capture-progreso-mini" hidden>
+        <div id="captura-progreso-track"><div id="captura-progreso-fill"></div></div>
+        <span id="captura-tiempo" class="captura-tiempo">00:00 / 00:30</span>
+      </div>
+
+      <div class="captura-resultado" id="captura-resultado" hidden>
+        <svg id="captura-chart" viewBox="0 0 220 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="captura-descargas">
+          <button type="button" id="btn-descargar-video" class="btn-mini">Video</button>
+          <button type="button" id="btn-descargar-datos" class="btn-mini">Datos</button>
+        </div>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- Estado afectivo: ventana fija bajo el dock. El circumplejo (valencia ×
+       activación) con el punto actual, el estado nombrado y el prompt vigente. -->
+  <section class="data-window" id="data-window" aria-label="Estado afectivo">
+    <div class="data-window-bar" id="data-window-bar">
+      <span class="data-window-title">
+        <span class="num">06</span>Estado
+        <span id="trigger-estado-afectivo" class="menu-trigger-estado">—</span>
+      </span>
+      <button type="button" class="data-window-toggle" id="data-window-toggle" aria-label="Minimizar ventana de estado">–</button>
+    </div>
+    <div class="data-window-body">
+      <div class="obs-frame plot-frame">
+        <svg id="plot-afectivo" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+      </div>
+      <div class="obs-meta obs-meta-flow">
+        <span class="dim" id="plot-estado-label">ESTADO — —</span>
+        <span class="ref" id="plot-prompt-ref">esperando señal…</span>
+      </div>
+    </div>
+  </section>
+
+  <footer class="frame-bar frame-bar-bottom">
+    <span>Javiera Alvear · Matías Pezoa · Felipe Roa — Computación Avanzada 2026</span>
+    <a class="home-link" href="../../index.html">← Volver al índice</a>
+  </footer>
+
+  <script>
+    if (window.matchMedia('(hover:hover) and (pointer:fine)').matches) {
+      var cur = document.querySelector('.cursor');
+      document.body.classList.add('cursor-active');
+      window.addEventListener('pointermove', function (e) {
+        cur.style.left = e.clientX + 'px';
+        cur.style.top = e.clientY + 'px';
+      });
+    }
+  </script>
+  <script src="main.js?v=1"></script>
+</body>
+</html>

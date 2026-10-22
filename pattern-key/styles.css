@@ -1,0 +1,234 @@
+/* ==========================================================
+   PATTERN KEY — estilos
+   Estética: laboratorio / mesa de corte. Fondo oscuro, acento
+   ácido, tipografía monoespaciada para los datos.
+   ========================================================== */
+
+:root {
+  --bg: #0d0d0d;
+  --panel: #161616;
+  --line: #2a2a2a;
+  --text: #ececec;
+  --muted: #8a8a8a;
+  --accent: #c8ff2e;      /* verde ácido: guiño al chroma key */
+  --danger: #ff3b5c;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+}
+
+/* ---------- Cabecera ---------- */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.top h1 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 22px;
+  letter-spacing: 0.18em;
+}
+.subtitle { margin: 0; color: var(--muted); font-size: 13px; }
+.status {
+  margin: 0 0 0 auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+.status.error { color: var(--danger); }
+
+/* ---------- Layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 0;
+  min-height: calc(100vh - 56px);
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-linear-gradient(45deg, #111 0 10px, #0f0f0f 10px 20px);
+  overflow: hidden;
+}
+#output {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 56px);
+  width: auto;
+  height: auto;
+  background: #000;
+}
+#video { display: none; }
+
+.stage-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.8;
+}
+.stage-empty[hidden] { display: none; }
+
+.hud {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--accent);
+  background: rgba(0, 0, 0, 0.55);
+  white-space: pre;
+  pointer-events: none;
+}
+.hud:empty { display: none; }
+
+/* ---------- Panel de controles ---------- */
+.panel {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  padding: 8px 16px 24px;
+  overflow-y: auto;
+  max-height: calc(100vh - 56px);
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* Botones */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--text);
+  background: transparent;
+  color: var(--text);
+  font: 600 13px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+}
+.btn:hover:not(:disabled) { background: var(--text); color: var(--bg); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.ghost { border-color: var(--line); color: var(--muted); }
+.btn.ghost:hover { border-color: var(--text); }
+.btn.small { min-height: 32px; font-size: 11px; }
+.btn.file input { display: none; }
+.btn.rec { border-color: var(--danger); color: var(--danger); }
+.btn.rec:hover:not(:disabled) { background: var(--danger); color: #fff; }
+.btn.rec.recording { background: var(--danger); color: #fff; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.6; } }
+
+/* Thumbnail del rapport */
+.thumb {
+  height: 120px;
+  border: 1px dashed var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0a0a0a;
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+.thumb img { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
+
+/* Sliders */
+.slider { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.slider > span { display: flex; justify-content: space-between; }
+.slider output { font-family: var(--mono); color: var(--accent); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+select {
+  min-height: 36px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font: 13px var(--mono);
+  padding: 4px 8px;
+}
+
+/* Selector segmentado de visualización */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.seg button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.seg button.on { border-color: var(--accent); color: var(--bg); background: var(--accent); }
+.seg button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.check { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.check.debug { flex-direction: column; align-items: stretch; }
+
+details.more { display: flex; flex-direction: column; gap: 6px; }
+details.more summary {
+  cursor: pointer;
+  font: 11px var(--mono);
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+details.more[open] { display: flex; }
+details.more > *:not(summary) { margin-top: 6px; width: 100%; }
+
+.download { font: 12px var(--mono); color: var(--accent); }
+
+/* Controles todavía no implementados (se desbloquean por fases) */
+.locked { opacity: 0.35; pointer-events: none; }
+.locked::after {
+  content: "próxima fase";
+  margin-left: 8px;
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+
+/* ---------- Móvil ---------- */
+@media (max-width: 820px) {
+  .layout { grid-template-columns: 1fr; min-height: 0; }
+  .stage { min-height: 50vh; }
+  #output { max-height: 70vh; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); max-height: none; }
+  .status { margin-left: 0; width: 100%; }
+}

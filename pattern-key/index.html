@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>PATTERN KEY</title>
+  <meta name="description" content="Chroma key basado en patrones textiles — herramienta experimental para estudiantes de diseño de moda." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>PATTERN KEY</h1>
+    <p class="subtitle">Chroma key basado en patrones textiles</p>
+    <p class="status" id="status" role="status">Cargando…</p>
+  </header>
+
+  <main class="layout">
+    <!-- ===== ESCENARIO: canvas final ===== -->
+    <section class="stage" aria-label="Salida de video">
+      <canvas id="output" width="1280" height="720"></canvas>
+      <div class="stage-empty" id="stageEmpty">
+        <p>1 · Carga un rapport<br />2 · Abre la cámara</p>
+      </div>
+      <div class="hud" id="hud"></div>
+      <!-- El <video> es la fuente; no se muestra, se dibuja en el canvas -->
+      <video id="video" playsinline muted autoplay></video>
+    </section>
+
+    <!-- ===== CONTROLES ===== -->
+    <aside class="panel" aria-label="Controles">
+
+      <div class="group">
+        <span class="label">01 Rapport</span>
+        <label class="btn file">
+          <input type="file" id="rapportInput" accept="image/png,image/jpeg" />
+          Cargar rapport
+        </label>
+        <div class="thumb" id="thumb"><span>sin rapport</span></div>
+        <button class="btn ghost small" id="exampleBtn" type="button">Usar rapport de ejemplo</button>
+      </div>
+
+      <div class="group">
+        <span class="label">02 Fuente</span>
+        <button class="btn" id="cameraBtn" type="button">Abrir cámara</button>
+        <select id="cameraSelect" hidden aria-label="Elegir cámara"></select>
+        <details class="more">
+          <summary>Fuentes de prueba</summary>
+          <label class="btn ghost small file">
+            <input type="file" id="videoInput" accept="video/*" />
+            Cargar video
+          </label>
+          <button class="btn ghost small" id="synthBtn" type="button">Escena sintética</button>
+        </details>
+      </div>
+
+      <div class="group">
+        <span class="label">03 Detección</span>
+        <label class="slider">
+          <span>Sensibilidad <output id="sensitivityOut">50</output></span>
+          <input type="range" id="sensitivity" min="0" max="100" value="50" />
+        </label>
+        <label class="slider">
+          <span>Suavizado <output id="smoothingOut">40</output></span>
+          <input type="range" id="smoothing" min="0" max="100" value="40" />
+        </label>
+        <label class="slider">
+          <span>Persistencia <output id="persistenceOut">40</output></span>
+          <input type="range" id="persistence" min="0" max="95" value="40" />
+        </label>
+        <button class="btn ghost small" id="resetBtn" type="button">Restablecer valores</button>
+      </div>
+
+      <div class="group">
+        <span class="label">04 Visualización</span>
+        <div class="seg" id="viewSeg" role="radiogroup" title="Atajos: teclas 1–4">
+          <button type="button" data-view="original" class="on">ORIGINAL</button>
+          <button type="button" data-view="mask">MASK</button>
+          <button type="button" data-view="effect">EFFECT</button>
+          <button type="button" data-view="composite">COMPOSITE</button>
+        </div>
+        <label class="check debug">MASK muestra:
+          <select id="debugSelect" aria-label="Qué mapa ver en modo MASK">
+            <option value="mask">máscara final</option>
+            <option value="sim">similitud (antes del umbral)</option>
+            <option value="color">señal A · color</option>
+            <option value="recipe">señal B · receta</option>
+            <option value="orb">señal C · ORB</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="group">
+        <span class="label">05 Efecto</span>
+        <select id="effectSelect" aria-label="Efecto">
+          <option value="distortion">Distortion</option>
+          <option value="rgbshift">RGB Shift</option>
+          <option value="pixelate">Pixelation</option>
+          <option value="blur">Blur</option>
+          <option value="noise">Noise</option>
+          <option value="displacement">Displacement</option>
+        </select>
+        <label class="slider">
+          <span>Intensidad <output id="intensityOut">60</output></span>
+          <input type="range" id="intensity" min="0" max="100" value="60" />
+        </label>
+      </div>
+
+      <div class="group">
+        <span class="label">06 Grabar</span>
+        <button class="btn rec" id="recordBtn" type="button" disabled>● Grabar</button>
+        <a id="downloadLink" class="download" hidden>Descargar grabación</a>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- OpenCV.js se carga de forma asíncrona desde detector.js (ver loadOpenCV) -->
+  <script type="module" src="js/app.js?v=4"></script>
+</body>
+</html>

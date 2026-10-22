@@ -1,0 +1,28 @@
+# Entorno de Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Credenciales (token de Hugging Face)
+.env
+
+# Datos de cada sesión: videos, audio y resultados pesan mucho y pueden
+# contener datos biométricos. Se quedan en el computador, no en el repo.
+sesiones/
+
+# Modelos descargados (MediaPipe)
+modelos/
+
+# Medios sueltos
+*.mp4
+*.mkv
+*.webm
+*.wav
+*.m4a
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,22 @@
+# Sistema / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.claude/
+*.log
+
+# Dependencias y builds locales
+node_modules/
+source/*/dist/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Credenciales
+.env
+secrets.h

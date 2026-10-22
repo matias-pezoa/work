@@ -1,0 +1,82 @@
+{
+  "version": "0.1-simulado",
+  "nota": "Capa intermedia entre los sensores del instrumento ESP32 y el prompt que gobierna Decart. NO es un clasificador entrenado: es una tabla declarativa. main.js proyecta el vector de sensores a un punto (valencia, activacion) del circumplejo de Russell y lo cae en la region de un estado. Las regiones se solapan a proposito; se elige el estado cuyo centro queda mas cerca del punto, con histeresis para que el video no parpadee entre estilos.",
+
+  "ejes": {
+    "activacion": {
+      "rango": [0, 1],
+      "descripcion": "energia / arousal. Se arma con la magnitud del movimiento de inclinacion (vector 2D X+Y), el dial del potenciometro y la frecuencia reciente de cambios bruscos.",
+      "pesos": { "tiltMag": 0.5, "control": 0.3, "cambioBruscoRate": 0.2 }
+    },
+    "valencia": {
+      "rango": [-1, 1],
+      "descripcion": "tono afectivo. Se arma con el matiz del color dominante (TCS34725) y la componente vertical del movimiento (inclinarse hacia atras abre / hacia adelante cierra).",
+      "pesos": { "colorHue": 0.7, "tiltVertical": 0.3 }
+    }
+  },
+
+  "color_a_valencia": {
+    "descripcion": "matiz HSL (grados) -> contribucion de valencia base. Interpolado linealmente entre anclas.",
+    "anclas": [
+      { "hue": 0,   "valencia": -0.7, "nombre": "rojo" },
+      { "hue": 45,  "valencia":  0.4, "nombre": "ambar" },
+      { "hue": 90,  "valencia":  0.7, "nombre": "verde" },
+      { "hue": 180, "valencia":  0.2, "nombre": "cian" },
+      { "hue": 240, "valencia": -0.4, "nombre": "azul" },
+      { "hue": 300, "valencia": -0.2, "nombre": "magenta" },
+      { "hue": 360, "valencia": -0.7, "nombre": "rojo" }
+    ],
+    "sin_color": 0.0
+  },
+
+  "estados": [
+    {
+      "id": "calma",
+      "etiqueta": "CALMA",
+      "centro": { "valencia": 0.6, "activacion": 0.15 },
+      "region": { "valencia": [0.2, 1], "activacion": [0, 0.32] },
+      "prompt": "retrato sereno, luz difusa y calida, niebla muy suave, paleta apagada, grano fino de pelicula, quietud",
+      "modificador_intensidad": "casi imperceptible, contemplativo"
+    },
+    {
+      "id": "melancolia",
+      "etiqueta": "MELANCOLIA",
+      "centro": { "valencia": -0.55, "activacion": 0.2 },
+      "region": { "valencia": [-1, -0.15], "activacion": [0, 0.38] },
+      "prompt": "retrato pensativo, luz fria de ventana, sombras largas, desaturado, tono azulado lavado, textura de papel humedo",
+      "modificador_intensidad": "lento, introspectivo"
+    },
+    {
+      "id": "disociacion",
+      "etiqueta": "DISOCIACION",
+      "centro": { "valencia": 0.0, "activacion": 0.5 },
+      "region": { "valencia": [-0.25, 0.25], "activacion": [0.3, 0.7] },
+      "prompt": "retrato fragmentado, doble exposicion, desenfoque parcial que se desplaza, bordes que no cierran, tono lavado, sensacion de estar y no estar",
+      "modificador_intensidad": "inestable, a la deriva"
+    },
+    {
+      "id": "tension",
+      "etiqueta": "TENSION",
+      "centro": { "valencia": -0.6, "activacion": 0.8 },
+      "region": { "valencia": [-1, -0.2], "activacion": [0.55, 1] },
+      "prompt": "retrato crispado, contraste duro, aberracion cromatica marcada, rojos saturados que sangran, micro-temblor, luz nerviosa",
+      "modificador_intensidad": "agudo, al limite"
+    },
+    {
+      "id": "euforia",
+      "etiqueta": "EUFORIA",
+      "centro": { "valencia": 0.6, "activacion": 0.85 },
+      "region": { "valencia": [0.2, 1], "activacion": [0.6, 1] },
+      "prompt": "retrato incandescente, luz que pulsa, colores fundidos y sobreexpuestos, estelas de movimiento, energia que desborda el encuadre",
+      "modificador_intensidad": "arrollador, sin freno"
+    }
+  ],
+
+  "prompt_base": "video restyle de una persona frente a camara, un solo sujeto, encuadre de retrato, {estado}, {intensidad}, coherencia temporal alta",
+
+  "transicion": {
+    "min_ms_entre_prompts": 1800,
+    "histeresis": 0.14,
+    "descripcion": "min_ms: no se manda un setPrompt nuevo a Decart antes de ese tiempo. histeresis: el punto (valencia,activacion) tiene que entrar en la region del nuevo estado por al menos ese margen antes de cambiar, si no se queda en el actual."
+  }
+}

@@ -1,0 +1,18 @@
+# Núcleo (obligatorio)
+yt-dlp
+faster-whisper
+spacy
+praat-parselmouth
+soundfile
+numpy
+mediapipe
+opencv-python
+
+# Modelo de español para spaCy (lematización). Se instala aparte:
+#   python -m spacy download es_core_news_md
+
+# Diarización (quién habla). Requiere token de Hugging Face, ver README.
+pyannote.audio
+
+# Sentimiento y emoción del texto en español (opcional)
+pysentimiento

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prueba: Decart (restyle de video en vivo)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Prueba aislada — Decart (Lucy Restyle / restyle de video en vivo)</h1>
+    <p class="subtitle">Cámara en vivo → API de Decart → video transformado según un prompt de texto. No está conectado a MQTT todavía — es solo para confirmar que el mecanismo funciona.</p>
+  </header>
+
+  <main>
+    <section class="panel" id="panel-aviso">
+      <h2>⚠️ Sin probar de punta a punta</h2>
+      <p class="hint">Este código está escrito siguiendo la documentación oficial de Decart, pero el entorno donde se construyó no tiene acceso de red a <code>platform.decart.ai</code> ni a <code>api3.decart.ai</code> (política de egress del sandbox), así que <strong>nunca se pudo probar la conexión real</strong>. La primera vez que lo corras, es esperable que algo falle — copia el error del panel de registro de abajo y lo revisamos juntos.</p>
+    </section>
+
+    <section class="panel" id="panel-cuenta">
+      <h2>1 · Cuenta y API key</h2>
+      <p class="hint">Crea una cuenta gratis en <a href="https://platform.decart.ai" target="_blank" rel="noopener">platform.decart.ai</a> — las cuentas nuevas reciben créditos gratis para probar antes de pagar. Genera una API key desde el dashboard y pégala aquí (solo se usa en tu navegador, no se guarda en ningún servidor).</p>
+      <div class="grid">
+        <label>API key
+          <input id="in-apikey" type="password" placeholder="dk_..." autocomplete="off" />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-camara">
+      <h2>2 · Cámara</h2>
+      <div class="actions">
+        <button id="btn-camara">Activar cámara</button>
+        <span id="estado-camara" class="badge badge-off">Sin cámara</span>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr;">
+        <div>
+          <p class="hint">Original</p>
+          <video id="video-local" autoplay muted playsinline style="width:100%; background:#000;"></video>
+        </div>
+        <div>
+          <p class="hint">Transformado (Decart)</p>
+          <video id="video-remoto" autoplay playsinline style="width:100%; background:#000;"></video>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-prompt">
+      <h2>3 · Transformación</h2>
+      <div class="grid">
+        <label class="wide">Prompt de estilo/escenario
+          <input id="in-prompt" type="text" placeholder="ej: bosque incendiándose, tormenta de ceniza" />
+        </label>
+      </div>
+      <div class="actions">
+        <button id="btn-conectar" disabled>Conectar y aplicar prompt</button>
+        <button id="btn-actualizar" disabled>Actualizar prompt (en vivo)</button>
+        <span id="estado-conexion" class="badge badge-off">Desconectado</span>
+      </div>
+      <p class="hint">Ideas de prompts para probar variación de "escenario/contexto": <em>"paisaje calmo, niebla suave"</em> vs. <em>"incendio, humo denso, caos"</em> — el mismo tipo de contraste que después se podría disparar con <code>intensidad</code>/<code>pico</code>.</p>
+    </section>
+
+    <section class="panel" id="panel-log">
+      <h2>4 · Registro</h2>
+      <div id="log"></div>
+    </section>
+  </main>
+
+  <script type="module" src="prueba_decart.js"></script>
+</body>
+</html>

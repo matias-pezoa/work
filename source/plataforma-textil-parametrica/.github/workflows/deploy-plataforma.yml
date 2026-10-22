@@ -1,0 +1,51 @@
+# Deploy de la plataforma parametrica a GitHub Pages.
+#
+# INACTIVO en esta ubicacion: GitHub solo ejecuta workflows en
+# `.github/workflows/` en la RAIZ del repo. Para activarlo, copia este archivo
+# a la raiz y ten en cuenta que el sitio raiz actual del repo dejaria de
+# publicarse (Pages permite un solo deployment por repo).
+#
+# Solo se dispara a mano (workflow_dispatch).
+name: Deploy plataforma parametrica
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "EJERICIO FABDIG/plataforma-textil-parametrica"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: "EJERICIO FABDIG/plataforma-textil-parametrica/package-lock.json"
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: "EJERICIO FABDIG/plataforma-textil-parametrica/dist"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

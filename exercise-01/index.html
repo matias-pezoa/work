@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VRTG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"></div>
+
+  <header class="frame-bar">
+    <div class="frame-bar-left">
+      <span>MP — 2026</span>
+      <nav class="frame-nav">
+        <a href="../index.html" class="frame-nav-btn">Inicio</a>
+        <button type="button" class="frame-nav-btn" onclick="history.back()">Atrás</button>
+      </nav>
+    </div>
+    <span>Lab 02 — VRTG</span>
+  </header>
+
+  <main class="app-shell">
+    <section class="viewport-shell">
+      <header class="project-header">
+        <div>
+          <span class="eyebrow">Registro 001 — Computación Avanzada / MCD UAI</span>
+          <h1>VRTG</h1>
+        </div>
+      </header>
+
+      <div id="viewport"></div>
+
+      <div id="mensaje-inicial" class="mensaje-inicial">
+        Sube una imagen o usa la cámara para comenzar
+      </div>
+
+      <div class="hud">
+        <div class="hud-bloque hud-top-left">
+          <p class="hud-titulo">VRTG</p>
+          <p>AUTOR: <span id="hud-autor">Matías Pezoa</span></p>
+          <p>CURSO: <span id="hud-curso">Computación Avanzada</span></p>
+          <p>UNIVERSIDAD: <span id="hud-universidad">Universidad Adolfo Ibáñez · MCD</span></p>
+        </div>
+
+        <div class="hud-bloque hud-top-right">
+          <p>NIVEL: <span id="hud-decibeles">-60.0 dB</span></p>
+        </div>
+
+        <div class="hud-bloque hud-bottom-left">
+          <p>PALETA</p>
+          <div id="hud-paleta" class="hud-paleta"></div>
+        </div>
+      </div>
+
+      <div class="hint">
+        Arrastra para orbitar · Rueda para acercar · Click derecho para desplazar
+      </div>
+    </section>
+
+    <aside class="controls-panel">
+      <div class="panel-header">
+        <span class="eyebrow">Registro 002 — Parámetros</span>
+        <h2>Espacio de diseño</h2>
+      </div>
+
+      <section class="control-group">
+        <h3><span class="idx">01</span>Imagen</h3>
+
+        <input id="imagen-input" type="file" accept="image/*" hidden />
+        <label for="imagen-input" class="boton-archivo">Subir imagen</label>
+
+        <button id="camara-activar" type="button" class="secondary boton-camara">Usar cámara (tiempo real)</button>
+
+        <div id="panel-camara" class="panel-camara oculto">
+          <video id="camara-video" autoplay playsinline muted></video>
+          <button id="camara-detener" type="button" class="secondary">Detener cámara</button>
+          <p id="camara-estado" class="panel-hint"></p>
+        </div>
+
+        <label>
+          <span>Resolución</span>
+          <output id="resolucion-valor">300</output>
+          <input id="resolucion" type="range" min="30" max="700" step="10" value="300" />
+        </label>
+
+        <label>
+          <span>Tamaño</span>
+          <output id="tamanio-particula-valor">0.035</output>
+          <input id="tamanio-particula" type="range" min="0.005" max="0.15" step="0.005" value="0.035" />
+        </label>
+
+        <label>
+          <span>Espaciado</span>
+          <output id="espaciado-valor">1.00</output>
+          <input id="espaciado" type="range" min="0.3" max="3" step="0.05" value="1" />
+        </label>
+
+        <label>
+          <span>Profundidad</span>
+          <output id="profundidad-valor">2.50</output>
+          <input id="profundidad" type="range" min="0" max="8" step="0.1" value="2.5" />
+        </label>
+      </section>
+
+      <section class="control-group">
+        <h3><span class="idx">02</span>Color</h3>
+
+        <label>
+          <span>Saturación</span>
+          <output id="saturacion-valor">1.00</output>
+          <input id="saturacion" type="range" min="0" max="2" step="0.05" value="1" />
+        </label>
+
+        <label>
+          <span>Especularidad</span>
+          <output id="especularidad-valor">0.60</output>
+          <input id="especularidad" type="range" min="0" max="2" step="0.05" value="0.6" />
+        </label>
+
+        <label>
+          <span>Colores personalizados</span>
+          <input id="colores-personalizados-activo" type="checkbox" />
+        </label>
+
+        <div id="paleta-personalizada" class="paleta-personalizada oculto">
+          <input id="color-personalizado-1" type="color" value="#1a1a2e" />
+          <input id="color-personalizado-2" type="color" value="#e94560" />
+          <input id="color-personalizado-3" type="color" value="#f5b642" />
+          <input id="color-personalizado-4" type="color" value="#f6f1e7" />
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h3><span class="idx">03</span>Distorsión</h3>
+
+        <label>
+          <span>Cantidad de distorsión</span>
+          <output id="distorsion-valor">0.30</output>
+          <input id="distorsion" type="range" min="0" max="2" step="0.05" value="0.3" />
+        </label>
+
+        <label>
+          <span>Nivel de glitch</span>
+          <output id="glitch-valor">0.35</output>
+          <input id="glitch" type="range" min="0" max="1" step="0.05" value="0.35" />
+        </label>
+
+        <button id="nuevo-glitch" class="secondary">Nuevo glitch</button>
+      </section>
+
+      <section class="control-group">
+        <h3><span class="idx">04</span>Audio</h3>
+
+        <p class="panel-hint">
+          Activa el micrófono: el volumen dispersa las partículas fuera de la imagen.
+        </p>
+
+        <div class="fila-audio">
+          <button id="audio-activar" type="button">Activar micrófono</button>
+          <output id="audio-nivel">0%</output>
+        </div>
+
+        <p id="audio-estado" class="panel-hint">Micrófono apagado</p>
+
+        <label>
+          <span>Sensibilidad</span>
+          <output id="audio-fuerza-valor">3.00</output>
+          <input id="audio-fuerza" type="range" min="0" max="10" step="0.1" value="3" />
+        </label>
+      </section>
+
+      <div class="actions">
+        <a href="../index.html" class="boton secondary">← Volver al inicio</a>
+        <button id="restablecer" class="secondary">Restablecer parámetros</button>
+      </div>
+
+      <footer class="panel-footer">
+        <span class="pull-mark">Hipótesis de trabajo —</span>
+        <p>
+          <strong>¿Qué tan "real" es una imagen cuando se fragmenta en datos que el sonido puede dispersar?</strong>
+        </p>
+      </footer>
+
+      <footer class="archive-footer">
+        <span>Matías Pezoa — 2026</span>
+        <span>Registro 002 — Lab 02</span>
+      </footer>
+    </aside>
+  </main>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module" src="./main.js"></script>
+
+  <script>
+    if (window.matchMedia('(hover:hover) and (pointer:fine)').matches) {
+      var cur = document.querySelector('.cursor');
+      document.body.classList.add('cursor-active');
+      window.addEventListener('pointermove', function (e) {
+        cur.style.left = e.clientX + 'px';
+        cur.style.top = e.clientY + 'px';
+      });
+    }
+  </script>
+</body>
+</html>

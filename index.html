@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Matías Pezoa — Work</title>
+  <meta name="description" content="Work: experimentos y trabajos de Matías Pezoa en diseño, moda, tecnología y fabricación digital.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"></div>
+
+  <header class="frame-bar">
+    <span>MP — Work</span>
+    <span>Diseño · Moda · Tecnología</span>
+  </header>
+
+  <main>
+
+    <!-- ESPÉCIMEN — retrato observado -->
+    <section class="specimen" aria-label="Presentación">
+      <div class="specimen-heading">
+        <span class="eyebrow">Work — Experimentos y trabajos</span>
+        <h1>Matías&nbsp;Pezoa</h1>
+        <p class="lead">Diseño, moda, tecnología y fabricación&nbsp;digital.</p>
+      </div>
+
+      <div class="obs specimen-field">
+        <svg class="obs-lines" aria-hidden="true"></svg>
+
+        <figure class="obs-frame obs-main" data-crop-source data-parallax>
+          <img src="assets/images/PERFIL.jpeg" alt="Retrato de Matías Pezoa" loading="eager">
+          <div class="obs-meta">
+            <span class="dim" data-dims>—</span>
+            <span class="ref">ESPÉCIMEN — PERFIL</span>
+          </div>
+          <span class="obs-marker marker-1" data-link="1"><span>01</span></span>
+          <span class="obs-marker marker-2" data-link="2"><span>02</span></span>
+        </figure>
+
+        <figure class="obs-frame crop-1" data-link="1" data-parallax>
+          <div class="obs-crop-media"></div>
+          <div class="obs-meta">
+            <span class="dim">01</span>
+            <span class="ref">DETALLE — SUP.</span>
+          </div>
+        </figure>
+
+        <figure class="obs-frame crop-2" data-link="2" data-parallax>
+          <div class="obs-crop-media"></div>
+          <div class="obs-meta">
+            <span class="dim">02</span>
+            <span class="ref">DETALLE — INF.</span>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <div class="page">
+
+      <!-- WORK — índice de trabajos.
+           Para agregar uno: copia su carpeta en la raíz del repo y duplica un <li>
+           arriba de la lista (el más nuevo va primero). data-type: "proyecto" o "curso".
+
+           <li data-type="proyecto"><a href="mi-trabajo/">
+             <span class="idx">12</span>
+             <span class="work-title">Título</span>
+             <span class="work-desc">Una línea que describe el trabajo.</span>
+             <span class="work-meta">2026 · Proyecto</span>
+             <span class="arrow" aria-hidden="true">→</span>
+           </a></li>
+      -->
+      <section class="record record-work reveal" id="work">
+        <div class="record-head">
+          <span class="record-index">Registro 001</span>
+          <span class="record-title">Work</span>
+          <div class="work-filter" role="group" aria-label="Filtrar trabajos">
+            <button type="button" data-filter="all" aria-pressed="true">Todo</button>
+            <button type="button" data-filter="proyecto" aria-pressed="false">Proyectos</button>
+            <button type="button" data-filter="curso" aria-pressed="false">Curso</button>
+          </div>
+        </div>
+        <div class="record-body">
+          <ul class="works">
+            <li data-type="proyecto"><a href="patron-moda/">
+              <span class="idx">11</span>
+              <span class="work-title">Cuerpo base</span>
+              <span class="work-desc">Patrón de moda paramétrico: delantero y espalda desde tus medidas, exportable a DXF.</span>
+              <span class="work-meta">2026 · Proyecto</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="proyecto"><a href="lo-que-queda/">
+              <span class="idx">10</span>
+              <span class="work-title">Lo que queda</span>
+              <span class="work-desc">Prototipo de desgaste por mirada, con ESP32.</span>
+              <span class="work-meta">2026 · Proyecto</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="proyecto"><a href="pattern-key/">
+              <span class="idx">09</span>
+              <span class="work-title">Pattern Key</span>
+              <span class="work-desc">Chroma key basado en patrones textiles, para estudiantes de diseño de moda.</span>
+              <span class="work-meta">2026 · Proyecto</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="proyecto"><a href="analisis-sesion/">
+              <span class="idx">08</span>
+              <span class="work-title">Análisis de sesiones</span>
+              <span class="work-desc">Análisis verbal y no verbal de una sesión grabada, en el navegador.</span>
+              <span class="work-meta">2026 · Proyecto</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="proyecto"><a href="plataforma-parametrica/">
+              <span class="idx">07</span>
+              <span class="work-title">Plataforma paramétrica textil</span>
+              <span class="work-desc">Herramienta de fabricación digital textil paramétrica.</span>
+              <span class="work-meta">2026 · Proyecto</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="proyecto"><a href="denat-decart/files/">
+              <span class="idx">06</span>
+              <span class="work-title">Deformación afectiva · Decart</span>
+              <span class="work-desc">Desnaturalización IA con restyle de video en vivo.</span>
+              <span class="work-meta">2026 · Proyecto</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="curso"><a href="prueba-decart/prueba_decart.html">
+              <span class="idx">05</span>
+              <span class="work-title">Prueba · Decart</span>
+              <span class="work-desc">Restyle de video en vivo.</span>
+              <span class="work-meta">2026 · Curso</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="curso"><a href="denat-ia/files/">
+              <span class="idx">04</span>
+              <span class="work-title">Desnaturalización IA</span>
+              <span class="work-desc">Prototipo de baja resolución — Exercise 03.</span>
+              <span class="work-meta">2026 · Curso</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="curso"><a href="exercise-02/">
+              <span class="idx">03</span>
+              <span class="work-title">VRTG Scent</span>
+              <span class="work-desc">Atlas morfológico 3D de perfumes a partir de datos reales — Exercise 02.</span>
+              <span class="work-meta">2026 · Curso</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="curso"><a href="lab-02/">
+              <span class="idx">02</span>
+              <span class="work-title">VRTG · Lab 02</span>
+              <span class="work-desc">Espacio de diseño paramétrico — Clase 02.</span>
+              <span class="work-meta">2026 · Curso</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+            <li data-type="curso"><a href="exercise-01/">
+              <span class="idx">01</span>
+              <span class="work-title">VRTG</span>
+              <span class="work-desc">Espacio de diseño paramétrico — Exercise 01.</span>
+              <span class="work-meta">2026 · Curso</span>
+              <span class="arrow" aria-hidden="true">→</span>
+            </a></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- PERFIL -->
+      <section class="record record-perfil reveal" id="perfil">
+        <div class="record-head">
+          <span class="record-index">Registro 002</span>
+          <span class="record-title">Perfil</span>
+        </div>
+        <div class="record-body">
+          <dl>
+            <dt>Disciplina / formación</dt>
+            <dd>Diseño Industrial + Magíster en Ciencias del Diseño.</dd>
+            <dt>Qué hago hoy</dt>
+            <dd>Trabajo como diseñador y docente universitario, especializado en la intersección entre moda, tecnología y fabricación digital. Desarrollo proyectos que integran diseño, procesos de fabricación y herramientas computacionales aplicadas al cuerpo y al vestuario.</dd>
+            <dt>Qué estoy explorando</dt>
+            <dd>Cómo utilizar sistemas digitales y computacionales para expandir los procesos de diseño de moda, conectando cuerpo, geometría, materialidad, fabricación e interacción.</dd>
+          </dl>
+        </div>
+      </section>
+
+      <!-- INTERESES -->
+      <section class="record record-intereses reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 003</span>
+          <span class="record-title">Intereses</span>
+        </div>
+        <div class="record-body">
+          <ul class="tags">
+            <li><span class="idx">01</span>Diseño computacional</li>
+            <li><span class="idx">02</span>Moda y tecnología</li>
+            <li><span class="idx">03</span>Fabricación digital</li>
+            <li><span class="idx">04</span>Diseño paramétrico</li>
+            <li><span class="idx">05</span>Wearables e interacción</li>
+            <li><span class="idx">06</span>Materiales y experimentación</li>
+            <li><span class="idx">07</span>Inteligencia artificial aplicada al diseño</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- PREGUNTA -->
+      <section class="record record-pregunta reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 004</span>
+          <span class="record-title">Pregunta de investigación</span>
+        </div>
+        <div class="record-body">
+          <span class="pull-mark">Hipótesis de trabajo —</span>
+          <p class="pull">¿Cómo puede el diseño computacional transformar la relación entre cuerpo, material y fabricación para generar nuevas formas de diseñar y producir indumentaria?</p>
+        </div>
+      </section>
+
+      <!-- INSPIRACIÓN -->
+      <section class="record record-inspiracion reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 005</span>
+          <span class="record-title">Referencia</span>
+        </div>
+        <div class="record-body">
+          <p>Los proyectos donde la tecnología no funciona únicamente como una herramienta para fabricar una forma previamente diseñada, sino como parte activa del proceso de diseño, permitiendo que el cuerpo, los materiales, los datos y los sistemas de fabricación participen en la generación del resultado.</p>
+
+          <div class="obs">
+            <svg class="obs-lines" aria-hidden="true"></svg>
+            <figure class="obs-frame insp-main" data-crop-source data-parallax>
+              <img src="assets/images/Hungry.jpg" alt="Imagen de referencia del proceso de diseño de Matías Pezoa" loading="lazy">
+              <div class="obs-meta">
+                <span class="dim" data-dims>—</span>
+                <span class="ref">REF. — CAPTURA</span>
+              </div>
+              <span class="obs-marker insp-marker" data-link="3"><span>03</span></span>
+            </figure>
+            <figure class="obs-frame insp-crop" data-link="3" data-parallax>
+              <div class="obs-crop-media"></div>
+              <div class="obs-meta">
+                <span class="dim">03</span>
+                <span class="ref">DETALLE</span>
+              </div>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODELO 3D -->
+      <section class="record record-modelo reveal">
+        <div class="record-head">
+          <span class="record-index">Registro 006</span>
+          <span class="record-title">Modelo 3D</span>
+        </div>
+        <div class="record-body">
+          <div class="obs-frame model-frame" data-parallax>
+            <model-viewer
+              class="model"
+              src="assets/models/GAGA.glb"
+              alt="Modelo 3D GAGA de Matías Pezoa"
+              camera-controls
+              touch-action="pan-y"
+              auto-rotate
+              shadow-intensity="1"
+              exposure="1">
+            </model-viewer>
+            <div class="obs-meta">
+              <span class="dim">GAGA.GLB — 41 MB</span>
+              <span class="ref">Arrastrar para orbitar</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTACTO -->
+      <section class="record record-links reveal" id="contacto">
+        <div class="record-head">
+          <span class="record-index">Registro 007</span>
+          <span class="record-title">Contacto</span>
+        </div>
+        <div class="record-body">
+          <ul class="links">
+            <li><a href="https://www.linkedin.com/in/matias-pezoa-a1532b12a/" rel="noopener"><span><span class="idx">01</span>LinkedIn</span><span class="arrow" aria-hidden="true">→</span></a></li>
+            <li><a href="https://www.instagram.com/m4.t1" rel="noopener"><span><span class="idx">02</span>Instagram</span><span class="arrow" aria-hidden="true">→</span></a></li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="archive-footer">
+    <span>Matías Pezoa — Work</span>
+    <span>Archivo vivo — GitHub Pages</span>
+  </footer>
+
+  <script>
+    // ---- custom cursor (solo en dispositivos con puntero fino) ----
+    if (window.matchMedia('(hover:hover) and (pointer:fine)').matches) {
+      var cur = document.querySelector('.cursor');
+      document.body.classList.add('cursor-active');
+      window.addEventListener('pointermove', function (e) {
+        cur.style.left = e.clientX + 'px';
+        cur.style.top = e.clientY + 'px';
+      });
+    }
+
+    // ---- filtro del índice WORK (todo / proyectos / curso) ----
+    var filterBtns = document.querySelectorAll('.work-filter button');
+    filterBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var type = btn.getAttribute('data-filter');
+        filterBtns.forEach(function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+        document.querySelectorAll('.works li').forEach(function (li) {
+          li.hidden = type !== 'all' && li.getAttribute('data-type') !== type;
+        });
+        // las alturas cambian: recalcular posiciones del parallax
+        capturePositions();
+        updateOnFrame();
+      });
+    });
+
+    // ---- metadata: dimensiones reales de las imágenes ----
+    document.querySelectorAll('[data-dims]').forEach(function (el) {
+      var img = el.closest('.obs-frame').querySelector('img');
+      function set() { el.textContent = img.naturalWidth + ' × ' + img.naturalHeight; }
+      if (img.complete && img.naturalWidth) set();
+      else img.addEventListener('load', set);
+    });
+
+    // ---- crops: usar la misma imagen como fondo ampliado ----
+    document.querySelectorAll('.obs').forEach(function (obs) {
+      var source = obs.querySelector('[data-crop-source] img');
+      if (!source) return;
+      obs.querySelectorAll('.obs-crop-media').forEach(function (media) {
+        media.style.setProperty('--img', 'url(' + source.getAttribute('src') + ')');
+      });
+    });
+
+    // ---- líneas de conexión entre marcadores y ampliaciones ----
+    var isDesktop = window.matchMedia('(min-width:901px)');
+
+    function anchor(rect, containerRect, dirX, dirY) {
+      var x = dirX === -1 ? rect.left : dirX === 1 ? rect.right : rect.left + rect.width / 2;
+      var y = dirY === -1 ? rect.top : dirY === 1 ? rect.bottom : rect.top + rect.height / 2;
+      return { x: x - containerRect.left, y: y - containerRect.top };
+    }
+
+    // reconstruye los <path> de un .obs; si ya fue revelado, los deja visibles
+    // de inmediato (sin repetir la animación de trazado en cada resize)
+    function buildPaths(obs) {
+      var svg = obs.querySelector('.obs-lines');
+      if (!svg) return;
+      var containerRect = obs.getBoundingClientRect();
+      svg.setAttribute('width', containerRect.width);
+      svg.setAttribute('height', containerRect.height);
+      svg.innerHTML = '';
+
+      var revealed = obs.dataset.revealed === '1';
+
+      obs.querySelectorAll('.obs-marker[data-link]').forEach(function (marker) {
+        var link = marker.getAttribute('data-link');
+        var crop = obs.querySelector('.obs-frame[data-link="' + link + '"]');
+        if (!crop) return;
+
+        var mRect = marker.getBoundingClientRect();
+        var cRect = crop.getBoundingClientRect();
+        var mCenter = { x: mRect.left + mRect.width / 2, y: mRect.top + mRect.height / 2 };
+        var cCenter = { x: cRect.left + cRect.width / 2, y: cRect.top + cRect.height / 2 };
+        var dx = cCenter.x - mCenter.x, dy = cCenter.y - mCenter.y;
+        var signX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+        var signY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+
+        var p1 = anchor(mRect, containerRect, signX, signY);
+        var p2 = anchor(cRect, containerRect, -signX, -signY);
+
+        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y);
+        svg.appendChild(path);
+
+        var len = path.getTotalLength();
+        path.style.strokeDasharray = len;
+        path.style.strokeDashoffset = revealed ? 0 : len;
+      });
+    }
+
+    function drawConnectors() {
+      if (!isDesktop.matches) return;
+      document.querySelectorAll('.obs').forEach(buildPaths);
+    }
+
+    // ---- los módulos se desplazan bastante y al azar por el espacio ----
+    var parallaxEls = document.querySelectorAll('[data-parallax]');
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // cada módulo recibe, una sola vez, una velocidad y dirección propias
+    // y aleatorias en X y en Y — así cada uno recorre una trayectoria distinta
+    function assignRandomFactors() {
+      parallaxEls.forEach(function (el) {
+        if (el.dataset.fy) return;
+        var signY = Math.random() < .5 ? -1 : 1;
+        var signX = Math.random() < .5 ? -1 : 1;
+        el.dataset.fy = signY * (.35 + Math.random() * .65);
+        el.dataset.fx = signX * (.15 + Math.random() * .4);
+      });
+    }
+
+    // guarda la posición "natural" (sin transform) de cada módulo, para
+    // poder calcular su desplazamiento sin que este se retroalimente
+    function capturePositions() {
+      parallaxEls.forEach(function (el) { el.style.transform = 'none'; });
+      parallaxEls.forEach(function (el) {
+        var rect = el.getBoundingClientRect();
+        el.dataset.naturalTop = rect.top + window.scrollY;
+        el.dataset.naturalH = rect.height;
+      });
+    }
+
+    var MAX_DRIFT = 340;
+    function clampDrift(v) { return Math.max(-MAX_DRIFT, Math.min(MAX_DRIFT, v)); }
+
+    function applyParallax() {
+      if (!parallaxEls.length || !isDesktop.matches || reduceMotion) return;
+      var vh = window.innerHeight, scrollY = window.scrollY;
+      parallaxEls.forEach(function (el) {
+        var top = parseFloat(el.dataset.naturalTop) - scrollY;
+        var center = top + parseFloat(el.dataset.naturalH) / 2;
+        var drive = center - vh / 2;
+        var offsetY = clampDrift(drive * parseFloat(el.dataset.fy));
+        var offsetX = clampDrift(drive * parseFloat(el.dataset.fx));
+        el.style.transform = 'translate(' + offsetX.toFixed(1) + 'px,' + offsetY.toFixed(1) + 'px)';
+      });
+    }
+
+    function updateOnFrame() {
+      applyParallax();
+      drawConnectors(); // las líneas se recalculan contra la posición ya desplazada
+    }
+
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        capturePositions();
+        updateOnFrame();
+      }, 150);
+    });
+
+    var scrollTicking = false;
+    window.addEventListener('scroll', function () {
+      if (scrollTicking) return;
+      scrollTicking = true;
+      requestAnimationFrame(function () {
+        updateOnFrame();
+        scrollTicking = false;
+      });
+    }, { passive: true });
+
+    window.addEventListener('load', function () {
+      capturePositions();
+      updateOnFrame();
+    });
+    assignRandomFactors();
+    capturePositions();
+    updateOnFrame();
+
+    // ---- revelado al hacer scroll ----
+    if ('IntersectionObserver' in window) {
+      var lineObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var obs = entry.target;
+          obs.dataset.revealed = '1';
+          obs.querySelectorAll('.obs-lines path').forEach(function (path, i) {
+            setTimeout(function () {
+              path.style.transition = 'stroke-dashoffset .5s ease-out';
+              path.style.strokeDashoffset = 0;
+            }, i * 120);
+          });
+          lineObserver.unobserve(obs);
+        });
+      }, { threshold: .4 });
+
+      var revealObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: .15 });
+
+      document.querySelectorAll('.record').forEach(function (r) { revealObserver.observe(r); });
+      document.querySelectorAll('.obs').forEach(function (o) { lineObserver.observe(o); });
+    }
+  </script>
+</body>
+</html>
