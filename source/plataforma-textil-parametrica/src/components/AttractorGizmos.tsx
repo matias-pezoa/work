@@ -25,6 +25,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { TransformControls } from '@react-three/drei'
 import { curvePath, type Attractor } from '../geometry/attractionField'
+import { useAppStore } from '../state/store'
 import {
   addAtPoint,
   DEFAULT_ATTRACTOR_Y,
@@ -33,13 +34,20 @@ import {
 
 interface AttractorGizmosProps {
   set: AttractorSet
+  /**
+   * Modo Ondas: los puntos tienen direccion. Se dibuja una barra que la
+   * indica y el gizmo puede ROTAR el punto (tecla R o el panel) ademas de
+   * moverlo.
+   */
+  rotatable?: boolean
 }
 
 /** Px que puede moverse el puntero entre presionar y soltar para contar como clic. */
 const CLICK_TOLERANCE_PX = 4
 
-export function AttractorGizmos({ set }: AttractorGizmosProps) {
+export function AttractorGizmos({ set, rotatable = false }: AttractorGizmosProps) {
   const handleRefs = useRef<Record<string, THREE.Mesh | null>>({})
+  const gizmoMode = useAppStore((s) => s.gizmoMode)
   const { attractors, selectedId, selectedPointIndex, select, update } = set
   const selected = attractors.find((a) => a.id === selectedId)
 
@@ -53,6 +61,7 @@ export function AttractorGizmos({ set }: AttractorGizmosProps) {
   const selectedObject = activeKey
     ? (handleRefs.current[activeKey] ?? undefined)
     : undefined
+  const rotating = rotatable && gizmoMode === 'rotate' && selected?.kind === 'point'
 
   return (
     <group>
@@ -75,6 +84,7 @@ export function AttractorGizmos({ set }: AttractorGizmosProps) {
           key={a.id}
           attractor={a}
           selected={a.id === selectedId}
+          showDirection={rotatable}
           activeIndex={a.id === selectedId ? activeIndex : -1}
           setRef={(index, el) => {
             handleRefs.current[`${a.id}:${index}`] = el
@@ -86,11 +96,19 @@ export function AttractorGizmos({ set }: AttractorGizmosProps) {
       {selected && selectedObject && (
         <TransformControls
           object={selectedObject}
-          mode="translate"
+          mode={rotating ? 'rotate' : 'translate'}
+          showX={!rotating}
+          showZ={!rotating}
           size={0.7}
           onObjectChange={() => {
             const o = handleRefs.current[activeKey!]
             if (!o) return
+            if (rotating) {
+              // rotacion Y de -θ lleva el +X local a (cos θ, 0, sin θ): ver handle
+              const deg = ((-o.rotation.y * 180) / Math.PI) % 180
+              update(selected.id, { angleDeg: deg < 0 ? deg + 180 : deg })
+              return
+            }
             const newPos = new THREE.Vector3(o.position.x, o.position.y, o.position.z)
             if (selected.kind === 'point') {
               update(selected.id, { position: newPos })
@@ -110,6 +128,7 @@ export function AttractorGizmos({ set }: AttractorGizmosProps) {
 interface AttractorGizmoProps {
   attractor: Attractor
   selected: boolean
+  showDirection: boolean
   /** Indice del punto activo de este atractor, o -1. */
   activeIndex: number
   setRef: (index: number, el: THREE.Mesh | null) => void
@@ -119,6 +138,7 @@ interface AttractorGizmoProps {
 function AttractorGizmo({
   attractor,
   selected,
+  showDirection,
   activeIndex,
   setRef,
   onSelectPoint,
@@ -146,11 +166,16 @@ function AttractorGizmo({
       {points.map((p, i) => {
         const corner = attractor.kind === 'curve' && !attractor.smooth[i]
         const active = i === activeIndex
+        // un punto con direccion: el handle va rotado (Y = -angulo) para que el
+        // gizmo de rotacion parta del angulo actual y la barra lo muestre.
+        const dirAngle =
+          showDirection && attractor.kind === 'point' ? attractor.angleDeg : null
         return (
           <group key={i}>
             <mesh
               ref={(el) => setRef(i, el)}
               position={[p.x, p.y, p.z]}
+              rotation={[0, dirAngle === null ? 0 : (-dirAngle * Math.PI) / 180, 0]}
               scale={active ? 1.35 : 1}
               onPointerDown={(e) => {
                 e.stopPropagation()
@@ -166,6 +191,13 @@ function AttractorGizmo({
                 color={color}
                 emissive={active ? '#8c8c87' : selected ? '#4a4a46' : '#000000'}
               />
+              {dirAngle !== null && (
+                // barra de direccion: eje local X (las costillas corren por ahi)
+                <mesh>
+                  <boxGeometry args={[2.6, 0.08, 0.08]} />
+                  <meshBasicMaterial color={color} />
+                </mesh>
+              )}
             </mesh>
             <mesh geometry={ring} position={[p.x, 0.004, p.z]}>
               <meshBasicMaterial

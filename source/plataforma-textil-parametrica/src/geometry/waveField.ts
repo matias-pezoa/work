@@ -12,12 +12,18 @@
  * `BaseShapeGround`, que sigue siendo solo la referencia visual de esa tela)
  * — por eso no hace falta modelar espesor de base ninguno.
  *
- * Construccion de cada costilla: es una linea recta en X (perpendicular a
- * las demas, todas paralelas y equiespaciadas por `spacingMm`); a lo largo
- * de su longitud en Z se muestrea la MISMA ondulacion radial que el modo
- * Volumen usa para atraer (`attractionField.falloff`, combinada por atractor
- * como un circulo concentrico que se aleja de una piedra tirada al agua), y
- * esa altura se extruye como un solido delgado (espesor `ribThicknessMm`)
+ * Trazado de las costillas en planta: son LINEAS DE FLUJO equiespaciadas
+ * (`spacingMm`) de un campo de direcciones (`flowDirection`). Lejos de los
+ * atractores siguen la direccion base del panel (`ribAngleDeg`; sin
+ * atractores = el peine de rectas paralelas de siempre); cerca de una curva
+ * atractora corren a lo largo de ella, y cerca de un punto toman su angulo
+ * (`angleDeg`, rotable). `flowStrength` = 0 vuelve a rectas paralelas. Dos
+ * costillas nunca se acercan eje a eje a menos de espesor + aire: si las
+ * lineas convergen, la costilla se corta ahi (`minRibDistanceMm`).
+ *
+ * A lo largo de cada costilla se muestrea la ondulacion de los atractores
+ * (`rippleHeight`: concentrica o direccional por atractor, con la misma
+ * envolvente `falloff` que el modo Volumen), y esa altura se extruye como un solido delgado (espesor `ribThicknessMm`)
  * de seccion "cerca de tierra". Una costilla no baja de una altura piso
  * (`heightFloorMm`): en zonas sin influencia de ningun atractor sigue
  * siendo un diente visible del peine. Si se pone `heightFloorMm` en 0, esa
@@ -52,10 +58,10 @@
  */
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { clamp } from '../utils/params'
+import { clamp, DEG2RAD } from '../utils/params'
 import type { NumberParam } from '../utils/params'
 import { mmToThree, threeToMm } from '../utils/units'
-import { closestDistance2D, falloff } from './attractionField'
+import { curveFrame2D, falloff } from './attractionField'
 import type { Attractor, CombineMode } from './attractionField'
 import { pointInBoundary, polygonBounds, type Boundary, type Vec2 } from './polygon'
 
@@ -94,6 +100,10 @@ export interface WaveFieldParams {
   /** Muestras del perfil por longitud de onda. Bajo = perfil angular; alto = curva suave. */
   facetsPerWave: number
   combine: CombineMode
+  /** Direccion base de las costillas en el plano, grados (0 = +X, 90 = +Z). */
+  ribAngleDeg: number
+  /** Cuanto doblan los atractores a las costillas (0 = rectas paralelas, 1 = siguen al atractor). */
+  flowStrength: number
 }
 
 export const DEFAULT_WAVE_FIELD: WaveFieldParams = {
@@ -105,6 +115,8 @@ export const DEFAULT_WAVE_FIELD: WaveFieldParams = {
   wavelengthMm: 70,
   facetsPerWave: 6,
   combine: 'max',
+  ribAngleDeg: 90,
+  flowStrength: 1,
 }
 
 export const WAVE_UI_PARAMS: readonly NumberParam[] = [
@@ -163,6 +175,24 @@ export const WAVE_UI_PARAMS: readonly NumberParam[] = [
     unit: 'mm',
   },
   {
+    key: 'ribAngleDeg',
+    label: 'Direccion base de costillas',
+    min: 0,
+    max: 180,
+    step: 1,
+    default: 90,
+    unit: 'grados',
+  },
+  {
+    key: 'flowStrength',
+    label: 'Flujo (costillas siguen atractores)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 1,
+    unit: '-',
+  },
+  {
     key: 'facetsPerWave',
     label: 'Muestras por onda',
     min: 2,
@@ -173,15 +203,21 @@ export const WAVE_UI_PARAMS: readonly NumberParam[] = [
   },
 ]
 
-const MAX_RIBS = 200
-const MAX_SAMPLES_PER_RIB = 200
+/** Tope de costillas (lineas de flujo) por panel. */
+const MAX_RIBS = 1200
+/** Tope de pasos de integracion por sentido de una linea de flujo. */
+const MAX_STEPS = 4000
+/** Una linea de flujo mas corta que esto (en separaciones) no se emite como costilla. */
+const MIN_RIB_LENGTH_SEPS = 1.5
+/** Peso minimo de la direccion base aun en el centro de un atractor (evita indefiniciones). */
+const BASE_FLOW_FLOOR = 0.02
 
 export interface WaveFieldResult {
   /** Malla con todas las costillas fusionadas (cada una sigue siendo un solido disjunto). */
   geometry: THREE.BufferGeometry
   bounds: THREE.Box3
   triangleCount: number
-  /** Cuantos ejes de costilla caen dentro del panel (antes de partirlos por el contorno). */
+  /** Cuantas costillas (lineas de flujo) se trazaron, antes de partirlas por altura minima. */
   ribCount: number
   /** Cuantas piezas solidas independientes se emitieron en total (una costilla puede partirse en varias). */
   segmentCount: number
@@ -193,6 +229,10 @@ export interface WaveFieldResult {
   maxHeightMm: number
   /** Esbeltez maxima (altura / espesor): aviso de vibracion/desprendimiento en costillas muy altas y finas. */
   maxAspectRatio: number
+  /** Distancia minima garantizada entre ejes de costillas vecinas (mm): espesor + aire, o mas. */
+  minRibDistanceMm: number
+  /** Ejes de las costillas en planta (x, z en u3d), antes de partirlas por altura. */
+  ribLines: Vec2[][]
 }
 
 export function buildWaveField(
@@ -216,45 +256,48 @@ export function buildWaveField(
   const materialThreshold = mmToThree(MIN_RIB_HEIGHT_MM)
 
   const domain = resolveDomain(params.planeSize, boundary)
-  const width = domain.maxX - domain.minX
-  const height = domain.maxZ - domain.minZ
 
-  const ribCount = clamp(width > 0 ? Math.floor(width / spacing) + 1 : 1, 1, MAX_RIBS)
-  const effectiveSpacing = ribCount > 1 ? width / (ribCount - 1) : 0
+  // Dos costillas vecinas nunca se acercan (eje a eje) a menos de `minDist`:
+  // asi entre sus caras siempre queda al menos el aire RIB_GAP_MM, aunque las
+  // lineas de flujo converjan. Si convergen mas, la costilla se corta ahi.
+  const minDist = Math.max(spacing * 0.5, thickness + gap)
+  const step = clamp(spacing / 3, 0.02, 0.4)
 
-  const sampleStep = wavelength / facets
-  const sampleCount = clamp(
-    height > 0 ? Math.round(height / sampleStep) : 1,
-    4,
-    MAX_SAMPLES_PER_RIB,
+  const lines = traceRibLines(
+    domain,
+    (x, z) => flowDirection(x, z, attractors, params),
+    spacing,
+    minDist,
+    step,
   )
 
   const heightAt = (x: number, z: number): number =>
     heightFloor + rippleHeight(x, z, attractors, params.combine, wavelength) * amplitude
-  // sin material (hueco) si la altura pedida ahi no llega al minimo imprimible.
-  const hasMaterial = (x: number, z: number): boolean =>
-    domain.test(x, z) && heightAt(x, z) >= materialThreshold
 
   const geoms: THREE.BufferGeometry[] = []
   let segmentCount = 0
   let maxHeight = 0
 
-  for (let i = 0; i < ribCount; i++) {
-    const x =
-      ribCount > 1 ? domain.minX + i * effectiveSpacing : (domain.minX + domain.maxX) / 2
-    for (const run of insideRuns(hasMaterial, domain.minZ, height, x, sampleCount)) {
-      const zs: number[] = []
-      const hs: number[] = []
-      for (let s = run.start; s <= run.end; s++) {
-        const z = domain.minZ + (s / sampleCount) * height
-        const h = heightAt(x, z)
-        zs.push(z)
-        hs.push(h)
-        if (h > maxHeight) maxHeight = h
+  for (const line of lines) {
+    // perfil facetado: la altura se muestrea cada `wavelength / facets` a lo
+    // largo de la costilla y se interpola linealmente entre estaciones (el
+    // trazo en planta sigue fino, la cresta queda angular como antes).
+    const hs = profileHeights(line, heightAt, wavelength / facets)
+    let start = -1
+    for (let i = 0; i <= line.length; i++) {
+      // sin material (hueco) donde la altura pedida no llega al minimo imprimible
+      const solid = i < line.length && hs[i] >= materialThreshold
+      if (solid && start < 0) start = i
+      if (!solid && start >= 0) {
+        if (i - start >= 2) {
+          const pts = line.slice(start, i)
+          const run = hs.slice(start, i)
+          for (const h of run) if (h > maxHeight) maxHeight = h
+          geoms.push(ribPolylineGeometry(pts, run, thickness))
+          segmentCount++
+        }
+        start = -1
       }
-      if (zs.length < 2) continue
-      geoms.push(ribSegmentGeometry(x, thickness, zs, hs))
-      segmentCount++
     }
   }
 
@@ -271,12 +314,14 @@ export function buildWaveField(
     geometry,
     bounds,
     triangleCount: indexCount(geometry) / 3,
-    ribCount,
+    ribCount: lines.length,
     segmentCount,
     appliedRibThicknessMm: threeToMm(thickness),
     thicknessLimited: thickness < requestedThickness - 1e-9,
     maxHeightMm: threeToMm(maxHeight),
     maxAspectRatio: thickness > 0 ? maxHeight / thickness : 0,
+    minRibDistanceMm: threeToMm(minDist),
+    ribLines: lines,
   }
 }
 
@@ -314,15 +359,230 @@ function resolveDomain(planeSize: number, boundary?: Boundary | null): Domain {
   }
 }
 
+// ------------------------------------------------------- campo de direccion
+
+/**
+ * Direccion (unitaria, en XZ) que siguen las costillas en (x, z).
+ *
+ * Una costilla es un EJE: 0 y 180 grados son la misma costilla. Por eso las
+ * direcciones se promedian en "angulo doble" (cos 2θ, sin 2θ): dos costillas
+ * a 10° y 190° suman en vez de anularse. Se mezclan:
+ *   - la direccion base del panel (`ribAngleDeg`), con peso 1 - (influencia
+ *     maxima de un atractor), para que lejos de todo mande la base y cerca de
+ *     un atractor mande el atractor;
+ *   - por atractor, con peso = su envolvente * `flowStrength`: el angulo
+ *     propio de un punto (`angleDeg`), o la tangente de una curva en su punto
+ *     mas cercano — asi las costillas corren a lo largo de la curva.
+ */
+export function flowDirection(
+  x: number,
+  z: number,
+  attractors: readonly Attractor[],
+  params: Pick<WaveFieldParams, 'ribAngleDeg' | 'flowStrength'>,
+): Vec2 {
+  const flow = clamp(params.flowStrength, 0, 1)
+  const base = params.ribAngleDeg * DEG2RAD
+  let ax = 0
+  let az = 0
+  let maxEnv = 0
+  if (flow > 0) {
+    for (const a of attractors) {
+      let d: number
+      let theta: number
+      if (a.kind === 'point') {
+        d = Math.hypot(x - a.position.x, z - a.position.z)
+        theta = a.angleDeg * DEG2RAD
+      } else {
+        const f = curveFrame2D(x, z, a)
+        d = f.d
+        theta = Math.atan2(f.tz, f.tx)
+      }
+      const env =
+        falloff(a.falloff, d, a.radius) * Math.min(1, Math.abs(a.strength)) * flow
+      if (env <= 0) continue
+      ax += env * Math.cos(2 * theta)
+      az += env * Math.sin(2 * theta)
+      if (env > maxEnv) maxEnv = env
+    }
+  }
+  const wb = Math.max(BASE_FLOW_FLOOR, 1 - maxEnv)
+  const vx = wb * Math.cos(2 * base) + ax
+  const vz = wb * Math.sin(2 * base) + az
+  const theta = Math.hypot(vx, vz) < 1e-9 ? base : Math.atan2(vz, vx) / 2
+  return [Math.cos(theta), Math.sin(theta)]
+}
+
+/**
+ * Lineas de flujo equiespaciadas (Jobard & Lefer, 1997) del campo `dirAt`:
+ * se traza una linea desde el centro; de cada linea aceptada salen semillas
+ * a `dsep` a cada lado; una semilla solo se usa si esta a >= `dsep` de todas
+ * las lineas existentes; cada linea se integra (RK2) en ambos sentidos hasta
+ * salir del dominio o acercarse a otra (o a si misma, si da la vuelta) a
+ * menos de `dtest`. Al agotarse las semillas se barre una grilla para cubrir
+ * zonas sueltas (islas, el otro lado de un agujero).
+ *
+ * Con un campo uniforme el resultado son rectas paralelas a `dsep` — el
+ * peine de siempre.
+ */
+function traceRibLines(
+  domain: Domain,
+  dirAt: (x: number, z: number) => Vec2,
+  dsep: number,
+  dtest: number,
+  step: number,
+): Vec2[][] {
+  const cell = dsep
+  const grid = new Map<string, { line: number; x: number; z: number }[]>()
+  const keyOf = (x: number, z: number) =>
+    `${Math.floor(x / cell)},${Math.floor(z / cell)}`
+  const lines: Vec2[][] = []
+  let totalPoints = 0
+  const maxTotalPoints = MAX_RIBS * 600
+  // descarta migajas, pero sin exigir mas largo del que entra en el panel
+  const minLength = Math.min(
+    MIN_RIB_LENGTH_SEPS * dsep,
+    0.5 * Math.min(domain.maxX - domain.minX, domain.maxZ - domain.minZ),
+  )
+
+  const inside = (x: number, z: number) =>
+    x >= domain.minX &&
+    x <= domain.maxX &&
+    z >= domain.minZ &&
+    z <= domain.maxZ &&
+    domain.test(x, z)
+
+  /** Algun punto de OTRA linea (o de cualquiera, si `self` es -1) a menos de `r`. */
+  const nearOthers = (x: number, z: number, r: number): boolean => {
+    const cx = Math.floor(x / cell)
+    const cz = Math.floor(z / cell)
+    const reach = Math.ceil(r / cell)
+    for (let i = cx - reach; i <= cx + reach; i++) {
+      for (let j = cz - reach; j <= cz + reach; j++) {
+        const bucket = grid.get(`${i},${j}`)
+        if (!bucket) continue
+        for (const p of bucket) if (Math.hypot(p.x - x, p.z - z) < r) return true
+      }
+    }
+    return false
+  }
+
+  // vecindad de la linea en curso: puntos ya trazados con su orden a lo largo
+  // de la linea, para detectar que da la vuelta sobre si misma.
+  const selfReach = Math.ceil((2 * dtest) / step) + 2
+  const integrate = (
+    x0: number,
+    z0: number,
+    sign: 1 | -1,
+    own: { x: number; z: number; order: number }[],
+  ): Vec2[] => {
+    const out: Vec2[] = []
+    const d0 = dirAt(x0, z0)
+    let px = d0[0] * sign
+    let pz = d0[1] * sign
+    let x = x0
+    let z = z0
+    for (let n = 1; n <= MAX_STEPS; n++) {
+      // RK2 (punto medio), manteniendo el sentido del paso anterior: el campo
+      // es un eje y su signo es arbitrario.
+      let [d1x, d1z] = dirAt(x, z)
+      if (d1x * px + d1z * pz < 0) [d1x, d1z] = [-d1x, -d1z]
+      const mx = x + (d1x * step) / 2
+      const mz = z + (d1z * step) / 2
+      let [d2x, d2z] = dirAt(mx, mz)
+      if (d2x * d1x + d2z * d1z < 0) [d2x, d2z] = [-d2x, -d2z]
+      const nx = x + d2x * step
+      const nz = z + d2z * step
+      if (!inside(nx, nz) || nearOthers(nx, nz, dtest)) break
+      const order = sign * n
+      if (
+        own.some(
+          (p) =>
+            Math.abs(p.order - order) > selfReach &&
+            Math.hypot(p.x - nx, p.z - nz) < dtest,
+        )
+      )
+        break
+      own.push({ x: nx, z: nz, order })
+      out.push([nx, nz])
+      x = nx
+      z = nz
+      px = d2x
+      pz = d2z
+    }
+    return out
+  }
+
+  const tryLine = (sx: number, sz: number): Vec2[] | null => {
+    if (!inside(sx, sz) || nearOthers(sx, sz, dsep * 0.99)) return null
+    const own = [{ x: sx, z: sz, order: 0 }]
+    const back = integrate(sx, sz, -1, own)
+    const fwd = integrate(sx, sz, 1, own)
+    const line: Vec2[] = [...back.reverse(), [sx, sz], ...fwd]
+    if ((line.length - 1) * step < minLength) return null
+    const id = lines.length
+    lines.push(line)
+    totalPoints += line.length
+    for (const [x, z] of line) {
+      const k = keyOf(x, z)
+      const bucket = grid.get(k)
+      if (bucket) bucket.push({ line: id, x, z })
+      else grid.set(k, [{ line: id, x, z }])
+    }
+    return line
+  }
+
+  const full = () => lines.length >= MAX_RIBS || totalPoints >= maxTotalPoints
+
+  // semillas a `dsep` a cada lado de una linea aceptada, cada ~media separacion
+  const seedEvery = Math.max(1, Math.round(dsep / step / 2))
+  const grow = (first: Vec2[]) => {
+    const queue = [first]
+    while (queue.length && !full()) {
+      const line = queue.shift()!
+      for (let i = 0; i < line.length && !full(); i += seedEvery) {
+        const a = line[Math.max(0, i - 1)]
+        const b = line[Math.min(line.length - 1, i + 1)]
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+        if (len < 1e-12) continue
+        const nx = -(b[1] - a[1]) / len
+        const nz = (b[0] - a[0]) / len
+        for (const s of [1, -1]) {
+          const next = tryLine(line[i][0] + s * nx * dsep, line[i][1] + s * nz * dsep)
+          if (next) queue.push(next)
+        }
+      }
+    }
+  }
+
+  const cx = (domain.minX + domain.maxX) / 2
+  const cz = (domain.minZ + domain.maxZ) / 2
+  const first = tryLine(cx, cz)
+  if (first) grow(first)
+  // cobertura: zonas a las que no llego ninguna semilla
+  for (let z = domain.minZ + dsep / 2; z <= domain.maxZ && !full(); z += dsep) {
+    for (let x = domain.minX + dsep / 2; x <= domain.maxX && !full(); x += dsep) {
+      const line = tryLine(x, z)
+      if (line) grow(line)
+    }
+  }
+  return lines
+}
+
+// ------------------------------------------------------------------- altura
+
 /**
  * Ondulacion combinada de todos los atractores en (x, z), normalizada a
  * [0, 1]. 0 = sin influencia en ese punto (costilla en su altura piso), 1 =
- * cresta maxima. La distancia es al PUNTO mas cercano del atractor (radial
- * para uno `kind: 'point'`, a la linea poligonal para uno `kind: 'curve'`,
- * ver `closestDistance2D`) — asi una curva atractora genera una cresta a lo
- * largo de todo su trazo, no solo en sus puntos de control.
+ * cresta maxima. La envolvente decae con la distancia al atractor (radial
+ * para un punto, a la curva para una curva); la FASE de la onda depende de
+ * su `waveMode`:
+ *   - 'concentric': la distancia misma -> circulos alrededor de un punto,
+ *     crestas paralelas a una curva (la onda se aleja del atractor).
+ *   - 'directional': un punto proyecta sobre su direccion (`angleDeg`) ->
+ *     crestas rectas y paralelas, cruzadas a esa direccion; una curva usa el
+ *     largo recorrido sobre ella -> la onda viaja a lo largo del trazo.
  */
-function rippleHeight(
+export function rippleHeight(
   x: number,
   z: number,
   attractors: readonly Attractor[],
@@ -333,79 +593,109 @@ function rippleHeight(
   for (const a of attractors) {
     const strength = Math.max(0, a.strength) // solo relieve hacia arriba
     if (strength <= 0) continue
-    const d = closestDistance2D(x, z, a)
+    let d: number
+    let phase: number
+    if (a.kind === 'point') {
+      const dx = x - a.position.x
+      const dz = z - a.position.z
+      d = Math.hypot(dx, dz)
+      const ang = a.angleDeg * DEG2RAD
+      phase = a.waveMode === 'directional' ? dx * Math.cos(ang) + dz * Math.sin(ang) : d
+    } else {
+      const f = curveFrame2D(x, z, a)
+      d = f.d
+      phase = a.waveMode === 'directional' ? f.s : d
+    }
     const envelope = falloff(a.falloff, d, a.radius) * strength
     if (envelope <= 0) continue
-    const wave = 0.5 + 0.5 * Math.sin((2 * Math.PI * d) / wavelength)
+    const wave = 0.5 + 0.5 * Math.sin((2 * Math.PI * phase) / wavelength)
     const contribution = envelope * wave
     acc = combine === 'sum' ? acc + contribution : Math.max(acc, contribution)
   }
   return clamp(acc, 0, 1)
 }
 
-interface Run {
-  start: number
-  end: number
+/**
+ * Altura en cada punto de la linea: se evalua `heightAt` en estaciones cada
+ * ~`stationStep` de largo recorrido (incluidos los extremos) y se interpola
+ * linealmente entre ellas — la cresta queda facetada aunque la linea en
+ * planta tenga muchos mas puntos.
+ */
+function profileHeights(
+  line: readonly Vec2[],
+  heightAt: (x: number, z: number) => number,
+  stationStep: number,
+): number[] {
+  const acc = [0]
+  for (let i = 1; i < line.length; i++) {
+    acc.push(
+      acc[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]),
+    )
+  }
+  const total = acc[acc.length - 1]
+  const n = Math.max(1, Math.round(total / stationStep))
+  const at = (s: number): Vec2 => {
+    let i = 1
+    while (i < acc.length - 1 && acc[i] < s) i++
+    const seg = acc[i] - acc[i - 1]
+    const t = seg > 1e-12 ? clamp((s - acc[i - 1]) / seg, 0, 1) : 0
+    return [
+      line[i - 1][0] + (line[i][0] - line[i - 1][0]) * t,
+      line[i - 1][1] + (line[i][1] - line[i - 1][1]) * t,
+    ]
+  }
+  const stations: number[] = []
+  for (let k = 0; k <= n; k++) {
+    const [x, z] = at((k / n) * total)
+    stations.push(heightAt(x, z))
+  }
+  return acc.map((s) => {
+    const u = total > 0 ? (s / total) * n : 0
+    const k = Math.min(n - 1, Math.floor(u))
+    return stations[k] + (stations[k + 1] - stations[k]) * (u - k)
+  })
 }
 
 /**
- * Tramos de muestras (indices [0, sampleCount] a lo largo de Z) donde el eje
- * `x` de una costilla tiene material segun `hasMaterial` (dentro del
- * contorno del panel Y con altura suficiente para imprimirse). Tanto un
- * contorno no convexo (p. ej. un agujero) como una altura piso en 0 pueden
- * partir una costilla en varios tramos disjuntos; cada uno se devuelve por
- * separado para emitirse como su propio solido cerrado.
+ * Solido cerrado de UNA costilla (o UN tramo) que sigue la polilinea `pts`
+ * en planta: pie plano en y = 0 (lo que se apoya contra la tela), perfil
+ * superior `hs[j]`, espesor constante `thickness` repartido a ambos lados del
+ * eje (desplazamiento en inglete, con tope para que una curva cerrada no
+ * dispare el vertice), y tapas en los dos extremos. Cada costilla es su
+ * propia malla, asi cada pieza es manifold por separado.
  */
-function insideRuns(
-  hasMaterial: (x: number, z: number) => boolean,
-  minZ: number,
-  spanZ: number,
-  x: number,
-  sampleCount: number,
-): Run[] {
-  const inside: boolean[] = []
-  for (let s = 0; s <= sampleCount; s++) {
-    const z = minZ + (s / sampleCount) * spanZ
-    inside.push(hasMaterial(x, z))
-  }
-  const runs: Run[] = []
-  let start = -1
-  for (let s = 0; s <= sampleCount; s++) {
-    if (inside[s] && start < 0) start = s
-    if ((!inside[s] || s === sampleCount) && start >= 0) {
-      const end = inside[s] ? s : s - 1
-      if (end > start) runs.push({ start, end })
-      start = -1
-    }
-  }
-  return runs
-}
-
-/**
- * Solido cerrado de UNA costilla (o UN tramo de costilla): pie plano en
- * y = 0 (lo que se apoya contra la tela en la cama de impresion), perfil
- * superior siguiendo `hs[j]` en cada `zs[j]`, espesor constante `thickness`
- * en X, y tapas en los dos extremos de la lista de muestras. Vertices
- * duplicados entre solidos (no hay: cada costilla es su propia malla) para
- * que cada pieza sea manifold por separado.
- */
-function ribSegmentGeometry(
-  x: number,
-  thickness: number,
-  zs: readonly number[],
+function ribPolylineGeometry(
+  pts: readonly Vec2[],
   hs: readonly number[],
+  thickness: number,
 ): THREE.BufferGeometry {
   const half = thickness / 2
-  const xf = x - half
-  const xb = x + half
-  const n = zs.length
+  const n = pts.length
+
+  // normal izquierda de cada tramo (para una costilla en +Z, apunta a -X:
+  // la misma cara "frontal" de siempre, asi el winding no cambia)
+  const segN: Vec2[] = []
+  for (let j = 0; j < n - 1; j++) {
+    const dx = pts[j + 1][0] - pts[j][0]
+    const dz = pts[j + 1][1] - pts[j][1]
+    const len = Math.hypot(dx, dz) || 1
+    segN.push([-dz / len, dx / len])
+  }
+  const offsetAt = (j: number): Vec2 => {
+    const a = segN[Math.max(0, j - 1)]
+    const b = segN[Math.min(n - 2, j)]
+    // inglete: |(a+b)/2| = cos(medio angulo); desplazar half/cos, con tope 2*half
+    const mx = (a[0] + b[0]) / 2
+    const mz = (a[1] + b[1]) / 2
+    const scale = half / Math.max(mx * mx + mz * mz, 0.25)
+    return [mx * scale, mz * scale]
+  }
 
   const positions: number[] = []
   const frontBottom: number[] = []
   const frontTop: number[] = []
   const backBottom: number[] = []
   const backTop: number[] = []
-
   const push = (px: number, py: number, pz: number): number => {
     const i = positions.length / 3
     positions.push(px, py, pz)
@@ -413,12 +703,13 @@ function ribSegmentGeometry(
   }
 
   for (let j = 0; j < n; j++) {
-    const z = zs[j]
+    const [ox, oz] = offsetAt(j)
+    const [x, z] = pts[j]
     const h = hs[j]
-    frontBottom.push(push(xf, 0, z))
-    frontTop.push(push(xf, h, z))
-    backBottom.push(push(xb, 0, z))
-    backTop.push(push(xb, h, z))
+    frontBottom.push(push(x + ox, 0, z + oz))
+    frontTop.push(push(x + ox, h, z + oz))
+    backBottom.push(push(x - ox, 0, z - oz))
+    backTop.push(push(x - ox, h, z - oz))
   }
 
   const indices: number[] = []
@@ -427,19 +718,18 @@ function ribSegmentGeometry(
   }
 
   for (let j = 0; j < n - 1; j++) {
-    // cara frontal (x = xf, normal hacia -X)
+    // cara frontal (lado izquierdo del avance)
     quad(frontBottom[j], frontBottom[j + 1], frontTop[j + 1], frontTop[j])
-    // cara trasera (x = xb, normal hacia +X)
+    // cara trasera
     quad(backTop[j], backTop[j + 1], backBottom[j + 1], backBottom[j])
     // filo superior (perfil de la onda)
     quad(frontTop[j], frontTop[j + 1], backTop[j + 1], backTop[j])
-    // pie (y = 0, normal hacia -Y, apoya contra la tela)
+    // pie (y = 0, apoya contra la tela)
     quad(frontBottom[j + 1], frontBottom[j], backBottom[j], backBottom[j + 1])
   }
 
-  // tapa del extremo inicial (normal hacia -Z: el solido crece hacia +Z desde aca)
+  // tapas de los extremos
   quad(frontTop[0], backTop[0], backBottom[0], frontBottom[0])
-  // tapa del extremo final (normal hacia +Z)
   const last = n - 1
   quad(frontBottom[last], backBottom[last], backTop[last], frontTop[last])
 

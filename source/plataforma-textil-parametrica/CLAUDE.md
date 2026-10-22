@@ -247,6 +247,37 @@ discretas).
   el techo (y nunca al reves), techo absoluto respetado, sum >= max en
   solapes, limites de segmentos por eje, malla valida, determinismo. 10 casos.
 
+#### Ondas: costillas que fluyen + crestas orientables (reemplaza al peine recto)
+- Las costillas ya NO son rectas paralelas fijas: son LINEAS DE FLUJO
+  equiespaciadas (Jobard & Lefer 1997, `traceRibLines`) de
+  `flowDirection(x, z)`. El campo mezcla en "angulo doble" (una costilla es un
+  eje: 0 y 180 son lo mismo) la direccion base `ribAngleDeg` (peso
+  `1 - envolvente maxima`, piso `BASE_FLOW_FLOOR`) con, por atractor (peso =
+  envolvente * `flowStrength`), el `angleDeg` de un punto o la tangente de una
+  curva en su punto mas cercano (`curveFrame2D`). Sin atractores o con
+  `flowStrength` 0 = el peine de rectas paralelas de antes (test).
+- Factibilidad: una linea se corta si se acerca a otra (o a si misma) a menos
+  de `minDist = max(spacing/2, espesor + RIB_GAP_MM)` — entre caras siempre
+  queda aire aunque las lineas converjan (test de distancia minima entre
+  costillas distintas). Integracion RK2 con paso `spacing/3`; migajas mas
+  cortas que `min(1.5 sep, medio panel)` se descartan; `MAX_RIBS` tope.
+  Despues de agotar semillas se barre una grilla para cubrir islas / el otro
+  lado de un agujero.
+- Perfil: la altura se evalua en estaciones cada `wavelength/facets` a lo
+  largo de la costilla y se interpola (cresta facetada, planta fina).
+  `ribPolylineGeometry` extruye la polilinea con inglete acotado (2x espesor);
+  mismo winding que la costilla recta original.
+- Crestas: `waveMode` por atractor (`concentric` = como antes; `directional` =
+  un punto proyecta sobre su `angleDeg`, una curva usa el largo recorrido `s`
+  -> la onda viaja a lo largo del trazo). `angleDeg`/`waveMode` viven en el
+  tipo Attractor comun pero solo los usa Ondas.
+- UI: barra de direccion en cada punto (handle rotado Y = -angulo);
+  `gizmoMode` en el store: tecla R (o el panel) alterna TransformControls entre
+  mover y rotar (solo eje Y; el angulo se lee de `-rotation.y`, mod 180).
+- Resultado expone `ribLines` y `minRibDistanceMm`. ~70 ms con la escena por
+  defecto; a 2 mm de separacion ~200+ ms.
+- Tests: `waveFlow.test.ts`.
+
 ### Base personalizada (importar SVG) — COMPLETO
 Compartida entre Volumen y Ondas: reemplaza el panel cuadrado por un contorno
 importado (p. ej. una pieza de patron con pinzas), sin tocar la logica de

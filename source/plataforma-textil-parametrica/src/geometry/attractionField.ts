@@ -42,12 +42,33 @@ interface AttractorCommon {
   /** Peso del atractor (puede ser negativo para "repeler" densidad). */
   strength: number
   falloff: FalloffType
+  /**
+   * Forma de las crestas (solo modo Ondas). 'concentric': la onda se aleja
+   * del atractor (circulos alrededor de un punto, paralelas a una curva).
+   * 'directional': la onda VIAJA en una direccion — la del angulo de un
+   * punto, o a lo largo del trazo de una curva (crestas cruzadas a ella).
+   */
+  waveMode: WaveMode
+}
+
+export type WaveMode = 'concentric' | 'directional'
+
+export const WAVE_MODE_LABELS: Record<WaveMode, string> = {
+  concentric: 'Concentrica',
+  directional: 'Direccional',
 }
 
 export interface PointAttractor extends AttractorCommon {
   kind: 'point'
   /** Posicion en unidades de Three.js. */
   position: THREE.Vector3
+  /**
+   * Direccion en el plano XZ, en grados (0 = +X, 90 = +Z). Solo la usa el
+   * modo Ondas: orienta las costillas cerca del punto y, en modo
+   * 'directional', la direccion en que viaja la onda. Es un EJE (0 y 180 dan
+   * lo mismo para las costillas).
+   */
+  angleDeg: number
 }
 
 export interface CurveAttractor extends AttractorCommon {
@@ -74,6 +95,9 @@ export interface AttractorPatch {
   radius?: number
   strength?: number
   falloff?: FalloffType
+  waveMode?: WaveMode
+  /** Solo puntos: direccion en grados (ver PointAttractor.angleDeg). */
+  angleDeg?: number
   position?: THREE.Vector3
   points?: THREE.Vector3[]
   /** Solo curvas: tipo de vertice por punto (se alinea al largo de `points`). */
@@ -96,11 +120,13 @@ export function applyAttractorPatch(a: Attractor, patch: AttractorPatch): Attrac
     radius: patch.radius ?? a.radius,
     strength: patch.strength ?? a.strength,
     falloff: patch.falloff ?? a.falloff,
+    waveMode: patch.waveMode ?? a.waveMode,
   }
   if (a.kind === 'point') {
     return {
       ...a,
       ...common,
+      angleDeg: patch.angleDeg ?? a.angleDeg,
       position: patch.position ? patch.position.clone() : a.position,
     }
   }
@@ -437,6 +463,9 @@ export function createAttractor(
     radius: overrides.radius ?? 6,
     strength: overrides.strength ?? 1,
     falloff: overrides.falloff ?? 'gaussian',
+    waveMode: overrides.waveMode ?? 'concentric',
+    // 90 = a lo largo de Z: la misma direccion base de las costillas.
+    angleDeg: overrides.angleDeg ?? 90,
   }
 }
 
@@ -456,5 +485,62 @@ export function createCurveAttractor(
     radius: overrides.radius ?? 6,
     strength: overrides.strength ?? 1,
     falloff: overrides.falloff ?? 'gaussian',
+    waveMode: overrides.waveMode ?? 'concentric',
   }
+}
+
+// ------------------------------------------------ marco local de una curva
+
+const _lengthCache = new WeakMap<CurveAttractor, number[]>()
+
+/** Largo acumulado (XZ) en cada vertice de `curvePath(a)`. */
+function cumulativeLengths(a: CurveAttractor): number[] {
+  const cached = _lengthCache.get(a)
+  if (cached) return cached
+  const pts = curvePath(a)
+  const acc = [0]
+  for (let i = 1; i < pts.length; i++) {
+    acc.push(acc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z))
+  }
+  _lengthCache.set(a, acc)
+  return acc
+}
+
+export interface CurveFrame {
+  /** Distancia (XZ) al punto mas cercano de la curva. */
+  d: number
+  /** Largo recorrido sobre la curva hasta ese punto. */
+  s: number
+  /** Tangente unitaria (XZ) de la curva en ese punto. */
+  tx: number
+  tz: number
+}
+
+/**
+ * Marco local de una curva visto desde (x, z), en el plano XZ: distancia,
+ * largo recorrido y tangente en el punto mas cercano. Lo usa el modo Ondas
+ * para que las costillas sigan la curva y la onda viaje a lo largo de ella.
+ */
+export function curveFrame2D(x: number, z: number, a: CurveAttractor): CurveFrame {
+  const pts = curvePath(a)
+  const acc = cumulativeLengths(a)
+  let best: CurveFrame = { d: Infinity, s: 0, tx: 1, tz: 0 }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const ax = pts[i].x
+    const az = pts[i].z
+    const abx = pts[i + 1].x - ax
+    const abz = pts[i + 1].z - az
+    const lenSq = abx * abx + abz * abz
+    if (lenSq < 1e-12) continue
+    const t = clamp(((x - ax) * abx + (z - az) * abz) / lenSq, 0, 1)
+    const d = Math.hypot(x - (ax + abx * t), z - (az + abz * t))
+    if (d < best.d) {
+      const len = Math.sqrt(lenSq)
+      best = { d, s: acc[i] + t * len, tx: abx / len, tz: abz / len }
+    }
+  }
+  if (best.d === Infinity && pts.length) {
+    best.d = Math.hypot(x - pts[0].x, z - pts[0].z)
+  }
+  return best
 }

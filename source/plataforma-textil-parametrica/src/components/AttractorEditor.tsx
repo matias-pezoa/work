@@ -11,7 +11,10 @@ import {
   MIN_CURVE_POINTS,
   removeCurvePoint,
 } from '../geometry/attractionField'
-import type { FalloffType } from '../geometry/attractionField'
+import { WAVE_MODE_LABELS } from '../geometry/attractionField'
+import type { FalloffType, WaveMode } from '../geometry/attractionField'
+import type { NumberParam } from '../utils/params'
+import { useAppStore } from '../state/store'
 import type { AttractorSet } from '../state/attractorSets'
 
 interface AttractorEditorProps {
@@ -20,6 +23,18 @@ interface AttractorEditorProps {
   planeSize: number
   /** Texto de ayuda propio del modo (por defecto, el del viewport 3D). */
   hint?: string
+  /** Modo Ondas: tipo de onda por atractor, direccion de los puntos y gizmo mover/rotar. */
+  waveControls?: boolean
+}
+
+const ANGLE_PARAM: NumberParam = {
+  key: 'angleDeg',
+  label: 'Direccion',
+  min: 0,
+  max: 180,
+  step: 1,
+  default: 90,
+  unit: 'grados',
 }
 
 const DEFAULT_HINT =
@@ -32,8 +47,11 @@ export function AttractorEditor({
   set,
   planeSize,
   hint = DEFAULT_HINT,
+  waveControls = false,
 }: AttractorEditorProps) {
   const { attractors, selectedId, selectedPointIndex } = set
+  const gizmoMode = useAppStore((s) => s.gizmoMode)
+  const setGizmoMode = useAppStore((s) => s.setGizmoMode)
   const selected = attractors.find((a) => a.id === selectedId)
 
   // posicion aleatoria dentro del panel: si se agregan varios de una, no
@@ -158,6 +176,58 @@ export function AttractorEditor({
               </button>
             ))}
           </div>
+          {waveControls && (
+            <>
+              <label className="param-label">Onda</label>
+              <div className="seg">
+                {(Object.keys(WAVE_MODE_LABELS) as WaveMode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={selected.waveMode === m ? 'active' : ''}
+                    onClick={() => set.update(selected.id, { waveMode: m })}
+                  >
+                    {WAVE_MODE_LABELS[m]}
+                  </button>
+                ))}
+              </div>
+              <p className="hint">
+                {selected.kind === 'point'
+                  ? selected.waveMode === 'directional'
+                    ? 'Crestas rectas, cruzadas a la direccion del punto.'
+                    : 'Circulos alrededor del punto. La direccion igual orienta las costillas cercanas.'
+                  : selected.waveMode === 'directional'
+                    ? 'La onda viaja a lo largo de la curva (crestas cruzadas a ella).'
+                    : 'Crestas paralelas a la curva. Las costillas cercanas corren a lo largo de ella.'}
+              </p>
+              {selected.kind === 'point' && (
+                <>
+                  <ParamSlider
+                    param={ANGLE_PARAM}
+                    value={selected.angleDeg}
+                    onChange={(v) => set.update(selected.id, { angleDeg: v })}
+                  />
+                  <label className="param-label">Gizmo (tecla R)</label>
+                  <div className="seg">
+                    <button
+                      type="button"
+                      className={gizmoMode === 'translate' ? 'active' : ''}
+                      onClick={() => setGizmoMode('translate')}
+                    >
+                      Mover
+                    </button>
+                    <button
+                      type="button"
+                      className={gizmoMode === 'rotate' ? 'active' : ''}
+                      onClick={() => setGizmoMode('rotate')}
+                    >
+                      Rotar
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
           {curve && (
             <>
               <label className="param-label">Forma de la linea</label>

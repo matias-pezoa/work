@@ -44,7 +44,7 @@ export function WaveFieldScene({ geometry, planeSize }: WaveFieldSceneProps) {
         </mesh>
       )}
 
-      <AttractorGizmos set={attractorSet} />
+      <AttractorGizmos set={attractorSet} rotatable />
     </group>
   )
 }

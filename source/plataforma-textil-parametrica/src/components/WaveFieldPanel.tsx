@@ -45,15 +45,18 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
         <p className="hint">
           Cada costilla es una pieza solida INDEPENDIENTE (un corte/contour, no un calado
           CNC): nace en y = 0 y no hay ninguna plancha de base que las una — la base es la
-          tela que ya esta puesta en la cama de impresion. Espesor de costilla minimo{' '}
-          {MIN_RIB_THICKNESS_MM}mm (se recorta si no entra en la separacion pedida, se
-          avisa abajo); separacion minima entre ejes {MIN_SPACING_MM}mm; longitud de onda
-          minima {MIN_WAVELENGTH_MM}mm. Al no tener voladizo real (son paredes casi
-          verticales, el perfil solo sube y baja dentro de la pared) no hace falta
-          recortar la amplitud por angulo — el riesgo en este modo es la esbeltez
-          (costillas muy altas y finas pueden vibrar o desprenderse), reportada abajo. Con
-          "Altura minima (valle)" en 0, las zonas sin influencia de ningun atractor quedan
-          directamente vacias (sin material) en vez de mostrar una costilla plana.
+          tela que ya esta puesta en la cama de impresion. Las costillas siguen la
+          direccion de los atractores (lineas de flujo), pero dos costillas nunca se
+          acercan a menos de su espesor + aire: si convergen, una se corta ahi. Espesor de
+          costilla minimo {MIN_RIB_THICKNESS_MM}mm (se recorta si no entra en la
+          separacion pedida, se avisa abajo); separacion minima entre ejes{' '}
+          {MIN_SPACING_MM}mm; longitud de onda minima {MIN_WAVELENGTH_MM}mm. Al no tener
+          voladizo real (son paredes casi verticales, el perfil solo sube y baja dentro de
+          la pared) no hace falta recortar la amplitud por angulo — el riesgo en este modo
+          es la esbeltez (costillas muy altas y finas pueden vibrar o desprenderse),
+          reportada abajo. Con "Altura minima (valle)" en 0, las zonas sin influencia de
+          ningun atractor quedan directamente vacias (sin material) en vez de mostrar una
+          costilla plana.
         </p>
       </section>
 
@@ -97,7 +100,18 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
         </div>
       </section>
 
-      <AttractorEditor set={attractorSet} planeSize={editorPlaneSize} />
+      <AttractorEditor
+        set={attractorSet}
+        planeSize={editorPlaneSize}
+        waveControls
+        hint={
+          'Clic en un punto para seleccionarlo; el gizmo lo mueve o, con la tecla R, lo ' +
+          'rota (la barra marca su direccion: las costillas cercanas corren por ahi). ' +
+          'Las costillas tambien corren a lo largo de las curvas. Clic derecho en el ' +
+          'plano: agrega un punto a la curva seleccionada, o un atractor nuevo. Supr ' +
+          'borra el punto seleccionado.'
+        }
+      />
 
       <section>
         <h3>Exportar</h3>
@@ -108,6 +122,10 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
               {result.appliedRibThicknessMm.toFixed(2)} mm
               {result.thicknessLimited ? ' (recortado)' : ''}
             </dd>
+          </div>
+          <div>
+            <dt>Distancia minima entre ejes</dt>
+            <dd>{result.minRibDistanceMm.toFixed(2)} mm</dd>
           </div>
           <div>
             <dt>Costillas</dt>

@@ -102,6 +102,17 @@ Mismo flujo de atractores que Volumen (botón "+ Agregar atractor", gizmo para
 arrastrar), pero con su propio set independiente — mover uno no afecta al otro
 modo.
 
+**Dirección.** Las costillas no son un peine fijo: **fluyen** siguiendo los
+atractores. Lejos de todo corren en la "Dirección base de costillas"; cerca de
+una curva corren a lo largo de ella; cerca de un punto toman su **dirección**
+(slider en el panel, o **tecla R** para rotar el punto con el gizmo; la barra
+del punto la muestra). "Flujo" en 0 vuelve a rectas paralelas. Dos costillas
+nunca se acercan a menos de su espesor + aire: si convergen, una se corta.
+
+Cada atractor elige su **onda**: *concéntrica* (círculos alrededor de un punto,
+crestas paralelas a una curva) o *direccional* (crestas rectas cruzadas a la
+dirección del punto; en una curva, la onda viaja a lo largo del trazo).
+
 ### Base personalizada: importar un patrón
 
 En ambos modos 3D, la sección **"Base personalizada"** del panel reemplaza el

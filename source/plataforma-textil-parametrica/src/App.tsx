@@ -79,7 +79,7 @@ export default function App() {
             {mode === 'volume' &&
               'Puas solidas y autosoportadas que emergen del plano (base de tela), sin solape entre si. Altura, radios, inclinacion y densidad segun el mapa de atractores.'}
             {mode === 'wave' &&
-              'Peine de costillas independientes (contour): cada una nace en y=0 sin plancha de base, con relieve trigonometrico radial desde cada atractor.'}
+              'Peine de costillas independientes (contour): cada una nace en y=0 sin plancha de base, que fluyen siguiendo la direccion de los atractores (R rota el punto seleccionado), con relieve concentrico o direccional.'}
             {mode === 'laser' &&
               'Solo vector: cortes y calados sobre la pieza plana, con puente minimo de material y kerf compensado. En el archivo: azul calado · verde corte · rojo contorno.'}
           </span>
@@ -134,12 +134,12 @@ const MODE_LABEL = { volume: 'Volumen', wave: 'Ondas', laser: 'Corte laser' } as
  * Supr / Delete (o Backspace, la tecla "delete" de Mac) borra el punto o el
  * atractor seleccionado del modo activo. Se ignora mientras se escribe en un
  * campo de texto/numero, para no borrar atractores al editar un valor.
+ * En el modo Ondas, R alterna el gizmo entre mover y rotar.
  */
 function useDeleteShortcut(kind: AttractorSetKind | null) {
   useEffect(() => {
     if (!kind) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return
       const t = e.target as HTMLElement | null
       const typing =
         t?.isContentEditable ||
@@ -147,6 +147,18 @@ function useDeleteShortcut(kind: AttractorSetKind | null) {
         (t?.tagName === 'INPUT' &&
           !['range', 'checkbox', 'button'].includes((t as HTMLInputElement).type))
       if (typing) return
+      const state = useAppStore.getState()
+      if (
+        kind === 'wave' &&
+        (e.key === 'r' || e.key === 'R') &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        state.setGizmoMode(state.gizmoMode === 'rotate' ? 'translate' : 'rotate')
+        return
+      }
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
       // snapshot fresco del store: el listener no se recrea en cada cambio.
       if (deleteSelection(attractorSetFrom(useAppStore.getState(), kind)))
         e.preventDefault()

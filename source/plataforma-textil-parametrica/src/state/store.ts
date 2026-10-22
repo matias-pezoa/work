@@ -27,6 +27,7 @@ import {
 } from '../geometry/attractionField'
 
 export type AppMode = 'volume' | 'wave' | 'laser'
+export type GizmoMode = 'translate' | 'rotate'
 
 /** Campos numericos de SpikeFieldParams editables desde la UI. */
 export type FieldNumericKey = Exclude<keyof SpikeFieldParams, 'combine' | 'alignToField'>
@@ -74,8 +75,12 @@ export interface AppState {
    */
   selectedPointIndex: number | null
 
+  /** Gizmo 3D del punto activo: mover o rotar (rotar solo aplica a puntos del modo Ondas). */
+  gizmoMode: GizmoMode
+
   // acciones
   setMode: (m: AppMode) => void
+  setGizmoMode: (m: GizmoMode) => void
   setFieldParam: (key: FieldNumericKey, value: number) => void
   setCombine: (mode: CombineMode) => void
   toggleAlignToField: () => void
@@ -217,8 +222,11 @@ export const useAppStore = create<AppState>((set) => ({
   laserAttractors: initialLaserAttractors(),
   selectedLaserAttractorId: null,
   selectedPointIndex: null,
+  gizmoMode: 'translate',
 
-  setMode: (mode) => set({ mode, selectedPointIndex: null }),
+  setMode: (mode) => set({ mode, selectedPointIndex: null, gizmoMode: 'translate' }),
+
+  setGizmoMode: (gizmoMode) => set({ gizmoMode }),
 
   setFieldParam: (key, value) => set((s) => ({ field: { ...s.field, [key]: value } })),
 
@@ -416,5 +424,6 @@ export const useAppStore = create<AppState>((set) => ({
       laserAttractors: initialLaserAttractors(),
       selectedLaserAttractorId: null,
       selectedPointIndex: null,
+      gizmoMode: 'translate',
     }),
 }))
