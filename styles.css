@@ -350,22 +350,6 @@ h1{
 .links a:hover .arrow{color:var(--white)}
 
 /* Work — índice de trabajos: fila con número, título, descripción y ficha */
-.work-filter{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
-.work-filter button{
-  font-family:var(--font-mono);
-  font-size:10px;
-  letter-spacing:.08em;
-  text-transform:uppercase;
-  color:var(--gray-2);
-  background:none;
-  border:1px solid var(--line-faint);
-  padding:5px 9px;
-  cursor:pointer;
-  transition:background-color .15s linear,color .15s linear;
-}
-.work-filter button:hover{color:var(--white);border-color:var(--line-soft)}
-.work-filter button[aria-pressed="true"]{background:var(--white);color:var(--black);border-color:var(--white)}
-
 .works{list-style:none;margin:0;padding:0;grid-column:1/13;border-top:1px solid var(--line-faint)}
 .works li{border-bottom:1px solid var(--line-faint)}
 .works a{
@@ -465,8 +449,6 @@ a:focus-visible{outline:1px solid var(--white);outline-offset:3px}
   .insp-main,.insp-crop{position:static;width:100%;aspect-ratio:1/1}
 
   .links{grid-column:1/13}
-  .record-work .record-head{flex-wrap:wrap}
-  .record-head .work-filter{margin-top:0;margin-left:auto}
   .works a{grid-template-columns:32px 1fr 20px;row-gap:6px}
   .works .work-title{grid-column:2}
   .works .arrow{grid-column:3;grid-row:1}

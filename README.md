@@ -27,8 +27,8 @@ Portafolio de experimentos y trabajos en diseño, moda, tecnología y fabricaci�
 
 1. Crea una carpeta en la raíz con un nombre corto en minúsculas (`mi-trabajo/`) y su `index.html`.
 2. Para el link de vuelta a la home usa `../index.html`.
-3. En `index.html`, dentro de `<ul class="works">`, duplica un `<li>` y ponlo primero.
-   Usa `data-type="proyecto"` o `data-type="curso"` según corresponda (hay una plantilla comentada encima de la sección).
+3. En `index.html`, dentro de `<ul class="works">`, duplica un `<li>` y ponlo primero
+   (hay una plantilla comentada encima de la sección).
 4. Haz commit y push. GitHub Pages lo publica en `https://matias-pezoa.github.io/work/mi-trabajo/`.
 
 ## Plataforma paramétrica
