@@ -21,15 +21,25 @@ npx serve patron-moda
   colapsada). El patrón se redibuja en vivo; las medidas quedan guardadas en
   `localStorage`.
 - "Pieza completa" espeja la mitad trazada sobre el doblez (útil para cortar).
-- Menú desplegable "Exportar" (mitad o pieza completa, según el toggle):
-  - **PDF** — vectorial, una sola página del tamaño de la lámina a escala 1:1,
-    con título, medidas usadas, leyenda y un cuadrado de control de 10 cm.
-    Usa jsPDF (cdnjs), que se carga solo al exportar.
-  - **PNG** — la misma lámina rasterizada a 40 px/cm (~102 dpi), con la
-    resolución escrita en el archivo (chunk `pHYs`) para imprimir a 1:1.
-  - **DXF** — `patron-cuerpo-base.dxf`. Capas: `CORTE`, `PINZAS`, `GUIAS`
-    (doblez y línea de cintura), `ETIQUETAS`. 1 unidad = 1 cm.
-  En los tres formatos las piezas quedan alineadas por la línea de cintura.
+- Menú desplegable "Exportar", todo con casillas (se recuerdan entre visitas);
+  mitad o pieza completa según el toggle "Pieza completa":
+  - **Formato** (uno o varios; se descarga un archivo por formato):
+    - **PDF** — vectorial, una sola página del tamaño de la lámina a escala 1:1,
+      con título, medidas usadas, leyenda y un cuadrado de control de 10 cm.
+      Usa jsPDF (cdnjs), que se carga solo al exportar.
+    - **PNG** — la misma lámina rasterizada a 40 px/cm (~102 dpi), con la
+      resolución escrita en el archivo (chunk `pHYs`) para imprimir a 1:1.
+    - **SVG** — la misma lámina como vector, 1 unidad = 1 cm y tamaño físico en cm.
+    - **DXF** — capas `CORTE`, `COSTURA` (solo con margen), `PINZAS`, `GUIAS`
+      (doblez y línea de cintura), `ETIQUETAS`. 1 unidad = 1 cm.
+  - **Piezas** — delantero, espalda o ambas (alineadas por la línea de cintura).
+  - **Solo molde** — únicamente el contorno de corte cerrado de cada pieza, sin
+    textos, guías, pinzas ni pie. Con SVG + una sola pieza sale un único path
+    cerrado, listo para importarlo como base en `plataforma-parametrica`.
+  - **Margen de costura** (cm) — el contorno de corte se desplaza hacia afuera
+    (Clipper, jsDelivr, cargado solo al usarlo); en una mitad, el doblez no lleva
+    margen. El contorno original queda como línea de costura punteada.
+  Nombre de archivo: `patron-<piezas>-<mitad|completo>[-molde][-costura-N_Ncm].<ext>`.
 
 ## Estructura
 
@@ -37,8 +47,9 @@ npx serve patron-moda
 - `bodice.js` — motor geométrico: medidas -> puntos/curvas de delantero y espalda.
 - `render.js` — SVG de las piezas, regla en cm y `fitScale` (escala de pantalla
   que hace que el molde llene la mesa; se recalcula al cambiar el tamaño).
+- `exportPieces.js` — piezas listas para exportar: polilíneas en cm y margen de costura.
 - `dxf.js` — exportador DXF (AC1015).
-- `sheet.js` — lámina de impresión 1:1 y su salida a SVG (para el PNG) y PDF.
+- `sheet.js` — lámina 1:1 (completa o "solo molde") y su salida a SVG, PNG y PDF.
 - `script.js`, `index.html`, `style.css` — interfaz.
 
 ## Del artículo al código

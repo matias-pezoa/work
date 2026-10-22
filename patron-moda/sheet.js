@@ -1,15 +1,14 @@
-// Lámina de impresión a escala real (1 unidad = 1 cm) para exportar a PDF y PNG.
+// Lámina a escala real (1 unidad = 1 cm) para exportar a PDF, PNG y SVG.
 //
 // Produce una lista de trazos independiente del formato:
-//   { kind: "poly", points, closed, style }   style: cut | fold | dart | guide | waist | frame
+//   { kind: "poly", points, closed, style }   style: cut | stitch | fold | dart | guide | waist | frame
 //   { kind: "dot",  x, y, r }
 //   { kind: "text", x, y, text, size, weight }  size en cm
 // El eje y crece hacia abajo, como en el resto del sistema.
 
-import { flattenChain } from "./dxf.js?v=4";
-
 export const SHEET_STYLES = {
   cut: { width: 0.05, dash: null, color: "#060606" },
+  stitch: { width: 0.02, dash: [0.3, 0.2], color: "#4a4a46" },
   fold: { width: 0.03, dash: [0.5, 0.4], color: "#060606" },
   dart: { width: 0.03, dash: null, color: "#060606" },
   guide: { width: 0.02, dash: [0.1, 0.3], color: "#4a4a46" },
@@ -18,6 +17,7 @@ export const SHEET_STYLES = {
 };
 
 const MARGIN = 2;
+const MOLD_MARGIN = 1; // "solo molde": solo el borde alrededor de las piezas
 const GAP = 6;
 const HEADER = 4; // título + datos
 const LABEL = 1.5; // espacio para el nombre de cada pieza
@@ -27,63 +27,75 @@ const shift = (points, dx, dy) => points.map((p) => ({ x: p.x + dx, y: p.y + dy 
 
 function pieceItems(piece, dx, dy) {
   const items = [];
-  const cut = piece.outline.filter((s) => !s.fold);
-  const fold = piece.centerLine ?? piece.outline.filter((s) => s.fold);
   for (const g of piece.guides) items.push({ kind: "poly", points: shift(g.points, dx, dy), style: "guide" });
-  items.push({ kind: "poly", points: shift(flattenChain(cut), dx, dy), closed: !fold.length || piece.mirrored, style: "cut" });
-  if (fold.length) items.push({ kind: "poly", points: shift(flattenChain(fold), dx, dy), style: "fold" });
+  if (piece.stitch) items.push({ kind: "poly", points: shift(piece.stitch, dx, dy), closed: piece.stitchClosed, style: "stitch" });
+  items.push({ kind: "poly", points: shift(piece.cut, dx, dy), closed: piece.cutClosed, style: "cut" });
+  if (piece.fold) items.push({ kind: "poly", points: shift(piece.fold, dx, dy), style: "fold" });
   for (const d of piece.darts) items.push({ kind: "poly", points: shift(d.points, dx, dy), closed: !!d.closed, style: "dart" });
-  const apex = piece.points.apex;
-  if (apex) items.push({ kind: "dot", x: apex.x + dx, y: apex.y + dy, r: 0.15 });
+  if (piece.apex) items.push({ kind: "dot", x: piece.apex.x + dx, y: piece.apex.y + dy, r: 0.15 });
   return items;
 }
 
 /**
- * @param {{front, back}} pieces piezas en cm (mitad o completas)
- * @param {{title?: string, subtitle?: string}} info
+ * @param {object[]} pieces piezas preparadas por exportPieces.js (una o varias)
+ * @param {{title?: string, subtitle?: string, mold?: boolean, seam?: number}} info
+ *   mold: "solo molde" — únicamente el contorno de corte cerrado de cada pieza,
+ *   sin textos, guías, pinzas, cintura ni pie.
  * @returns {{width: number, height: number, items: object[]}} medidas en cm
  */
-export function buildSheet({ front, back }, info = {}) {
-  const fb = front.bounds;
-  const bb = back.bounds;
+export function buildSheet(pieces, info = {}) {
+  const mold = !!info.mold;
+  const margin = mold ? MOLD_MARGIN : MARGIN;
+  const top = mold ? margin : margin + HEADER + LABEL;
   // Igual que en pantalla: las piezas se alinean por la línea de cintura.
-  const above = Math.max(front.points.W.y - fb.minY, back.points.W.y - bb.minY);
-  const below = Math.max(fb.maxY - front.points.W.y, bb.maxY - back.points.W.y);
-  const waistY = MARGIN + HEADER + LABEL + above;
-  const piecesW = fb.width + GAP + bb.width;
-  const width = Math.max(MARGIN * 2 + piecesW, 40);
-  const height = waistY + below + FOOTER + MARGIN;
-
-  const frontDx = MARGIN - fb.minX;
-  const frontDy = waistY - front.points.W.y;
-  const backDx = MARGIN + fb.width + GAP - bb.minX;
-  const backDy = waistY - back.points.W.y;
+  const above = Math.max(...pieces.map((p) => p.waistY - p.bounds.minY));
+  const below = Math.max(...pieces.map((p) => p.bounds.maxY - p.waistY));
+  const waistY = top + above;
+  const piecesW = pieces.reduce((s, p) => s + p.bounds.width, 0) + GAP * (pieces.length - 1);
+  const width = mold ? margin * 2 + piecesW : Math.max(margin * 2 + piecesW, 40);
+  const height = waistY + below + (mold ? 0 : FOOTER) + margin;
 
   const items = [];
-  items.push({ kind: "text", x: MARGIN, y: MARGIN + 1, text: info.title ?? "CUERPO BASE", size: 1.1, weight: "bold" });
-  if (info.subtitle) items.push({ kind: "text", x: MARGIN, y: MARGIN + 2.2, text: info.subtitle, size: 0.45 });
-  items.push({ kind: "text", x: MARGIN, y: MARGIN + 3, text: "Escala 1:1 - 1 unidad = 1 cm - sin margen de costura", size: 0.45 });
+  let x = margin;
+  const placed = pieces.map((p) => {
+    const at = { piece: p, dx: x - p.bounds.minX, dy: waistY - p.waistY };
+    x += p.bounds.width + GAP;
+    return at;
+  });
 
-  items.push({ kind: "poly", points: [{ x: MARGIN * 0.5, y: waistY }, { x: width - MARGIN * 0.5, y: waistY }], style: "waist" });
+  if (mold) {
+    for (const { piece, dx, dy } of placed) {
+      items.push({ kind: "poly", points: shift(piece.loop, dx, dy), closed: true, style: "cut" });
+    }
+    return { width, height, items };
+  }
 
-  items.push(...pieceItems(front, frontDx, frontDy));
-  items.push({ kind: "text", x: fb.minX + frontDx, y: fb.minY + frontDy - 0.6, text: front.label.toUpperCase(), size: 0.5 });
-  items.push(...pieceItems(back, backDx, backDy));
-  items.push({ kind: "text", x: bb.minX + backDx, y: bb.minY + backDy - 0.6, text: back.label.toUpperCase(), size: 0.5 });
+  const seamNote = info.seam ? `margen de costura ${info.seam} cm incluido` : "sin margen de costura";
+  items.push({ kind: "text", x: margin, y: margin + 1, text: info.title ?? "CUERPO BASE", size: 1.1, weight: "bold" });
+  if (info.subtitle) items.push({ kind: "text", x: margin, y: margin + 2.2, text: info.subtitle, size: 0.45 });
+  items.push({ kind: "text", x: margin, y: margin + 3, text: `Escala 1:1 - 1 unidad = 1 cm - ${seamNote}`, size: 0.45 });
+
+  items.push({ kind: "poly", points: [{ x: margin * 0.5, y: waistY }, { x: width - margin * 0.5, y: waistY }], style: "waist" });
+
+  for (const { piece, dx, dy } of placed) {
+    items.push(...pieceItems(piece, dx, dy));
+    items.push({ kind: "text", x: piece.bounds.minX + dx, y: piece.bounds.minY + dy - 0.6, text: piece.label.toUpperCase(), size: 0.5 });
+  }
 
   // Pie: cuadrado de control de 10 cm + leyenda.
   const footY = waistY + below + 2;
   const sq = [
-    { x: MARGIN, y: footY }, { x: MARGIN + 10, y: footY },
-    { x: MARGIN + 10, y: footY + 10 }, { x: MARGIN, y: footY + 10 },
+    { x: margin, y: footY }, { x: margin + 10, y: footY },
+    { x: margin + 10, y: footY + 10 }, { x: margin, y: footY + 10 },
   ];
   items.push({ kind: "poly", points: sq, closed: true, style: "frame" });
-  items.push({ kind: "text", x: MARGIN + 0.5, y: footY + 5.2, text: "10 x 10 cm", size: 0.5 });
-  items.push({ kind: "text", x: MARGIN + 0.5, y: footY + 6, text: "verificar escala al imprimir", size: 0.35 });
+  items.push({ kind: "text", x: margin + 0.5, y: footY + 5.2, text: "10 x 10 cm", size: 0.5 });
+  items.push({ kind: "text", x: margin + 0.5, y: footY + 6, text: "verificar escala al imprimir", size: 0.35 });
 
-  const legendX = MARGIN + 13;
+  const legendX = margin + 13;
   const legend = [
     ["cut", "Corte"],
+    ...(info.seam ? [["stitch", "Costura"]] : []),
     ["fold", "Doblez (CF / CB)"],
     ["dart", "Pinza"],
     ["guide", "Linea de cintura"],
@@ -97,29 +109,47 @@ export function buildSheet({ front, back }, info = {}) {
   return { width, height, items };
 }
 
-// ---------- SVG (base del PNG) ----------
+// ---------- SVG (base del PNG, y archivo .svg vectorial en cm) ----------
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export function sheetToSvg(sheet, pxPerCm) {
-  const k = pxPerCm;
+// k: unidades SVG por cm; minStroke: grosor mínimo (1 px en el PNG).
+function svgParts(sheet, k, digits, minStroke) {
+  const n = (v) => (v * k).toFixed(digits);
   const parts = [];
   for (const it of sheet.items) {
     if (it.kind === "poly") {
       const st = SHEET_STYLES[it.style];
-      const d = it.points.map((p, i) => `${i ? "L" : "M"}${(p.x * k).toFixed(2)} ${(p.y * k).toFixed(2)}`).join(" ") + (it.closed ? " Z" : "");
-      const dash = st.dash ? ` stroke-dasharray="${st.dash.map((v) => (v * k).toFixed(2)).join(" ")}"` : "";
-      parts.push(`<path d="${d}" fill="none" stroke="${st.color}" stroke-width="${Math.max(1, st.width * k).toFixed(2)}" stroke-linejoin="miter"${dash}/>`);
+      const d = it.points.map((p, i) => `${i ? "L" : "M"}${n(p.x)} ${n(p.y)}`).join(" ") + (it.closed ? " Z" : "");
+      const dash = st.dash ? ` stroke-dasharray="${st.dash.map(n).join(" ")}"` : "";
+      parts.push(`<path d="${d}" fill="none" stroke="${st.color}" stroke-width="${Math.max(minStroke, st.width * k).toFixed(digits)}" stroke-linejoin="miter"${dash}/>`);
     } else if (it.kind === "dot") {
-      parts.push(`<circle cx="${(it.x * k).toFixed(2)}" cy="${(it.y * k).toFixed(2)}" r="${(it.r * k).toFixed(2)}" fill="#060606"/>`);
+      parts.push(`<circle cx="${n(it.x)}" cy="${n(it.y)}" r="${n(it.r)}" fill="#060606"/>`);
     } else if (it.kind === "text") {
       const weight = it.weight === "bold" ? ' font-weight="700"' : "";
-      parts.push(`<text x="${(it.x * k).toFixed(2)}" y="${(it.y * k).toFixed(2)}" font-family="'JetBrains Mono', Menlo, Consolas, monospace" font-size="${(it.size * k).toFixed(2)}"${weight} fill="#060606">${esc(it.text)}</text>`);
+      parts.push(`<text x="${n(it.x)}" y="${n(it.y)}" font-family="'JetBrains Mono', Menlo, Consolas, monospace" font-size="${n(it.size)}"${weight} fill="#060606">${esc(it.text)}</text>`);
     }
   }
-  const w = Math.round(sheet.width * k);
-  const h = Math.round(sheet.height * k);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="100%" height="100%" fill="#ffffff"/>${parts.join("")}</svg>`;
+  return parts.join("\n");
+}
+
+export function sheetToSvg(sheet, pxPerCm) {
+  const w = Math.round(sheet.width * pxPerCm);
+  const h = Math.round(sheet.height * pxPerCm);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="100%" height="100%" fill="#ffffff"/>${svgParts(sheet, pxPerCm, 2, 1)}</svg>`;
+}
+
+// 1 unidad = 1 cm y tamaño físico en cm. Sin rectángulo de fondo: al
+// importarlo (p. ej. en plataforma-parametrica) el contorno más grande debe
+// ser el de la pieza.
+export function sheetToVectorSvg(sheet) {
+  const w = +sheet.width.toFixed(3);
+  const h = +sheet.height.toFixed(3);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}cm" height="${h}cm" viewBox="0 0 ${w} ${h}">
+${svgParts(sheet, 1, 3, 0)}
+</svg>
+`;
 }
 
 // ---------- PDF (jsPDF, vectorial, página del tamaño de la lámina) ----------

@@ -172,12 +172,21 @@ button.secondary:hover{background:var(--white);color:var(--black)}
 .export-menu summary::after{content:"\25BE";font-size:10px}
 .export-menu[open] summary::after{content:"\25B4"}
 .export-menu summary:hover,.export-menu[open] summary{background:var(--black);color:var(--white)}
-.export-options{border:1px solid var(--line-soft);border-top:none}
-.export-options button{display:flex;justify-content:space-between;align-items:baseline;background:transparent;color:var(--white);border:none;border-bottom:1px solid var(--line-faint);text-align:left}
-.export-options button:last-child{border-bottom:none}
-.export-options button:hover{background:var(--white);color:var(--black)}
-.export-options .fmt-note{font-size:9px;font-weight:400;letter-spacing:.06em;color:var(--gray-2)}
-.export-options button:hover .fmt-note{color:var(--gray-3)}
+.export-panel{border:1px solid var(--line-soft);border-top:none;padding:14px 12px 12px;display:flex;flex-direction:column;gap:14px}
+.export-panel fieldset{border:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.export-panel legend{padding:0;margin-bottom:6px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--gray-2)}
+.check-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:5px 0;font-size:12px;color:var(--gray-1);cursor:pointer}
+.check-row .check-label{display:contents;cursor:pointer}
+.check-row input[type="checkbox"]{width:14px;height:14px;margin:0;accent-color:var(--white);cursor:pointer}
+.check-row:has(input[type="checkbox"]:checked){color:var(--white)}
+.check-row .fmt-note{font-size:9px;letter-spacing:.06em;color:var(--gray-2);text-align:right}
+.seam-value{display:flex;align-items:baseline;gap:4px;font-size:12px;font-variant-numeric:tabular-nums}
+.seam-value input{width:3.4em;background:transparent;border:none;border-bottom:1px solid var(--line-soft);border-radius:0;
+  color:var(--white);font:inherit;text-align:right;padding:2px 0;-moz-appearance:textfield}
+.seam-value input::-webkit-inner-spin-button,.seam-value input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.seam-value input:focus{border-bottom-color:var(--white);outline:none}
+.seam-value input:disabled{opacity:.35}
+.seam-value .unit{font-size:10px;color:var(--gray-2)}
 
 .status-line{min-height:1.4em;margin:0;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-1)}
 

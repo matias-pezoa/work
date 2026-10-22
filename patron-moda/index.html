@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./style.css?v=4" />
+  <link rel="stylesheet" href="./style.css?v=5" />
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -76,11 +76,29 @@
         </label>
         <details class="export-menu" id="export-menu">
           <summary>Exportar</summary>
-          <div class="export-options" role="menu">
-            <button type="button" role="menuitem" data-format="pdf"><span>PDF</span><span class="fmt-note">Impresión 1:1</span></button>
-            <button type="button" role="menuitem" data-format="png"><span>PNG</span><span class="fmt-note">Imagen 1:1 · 102 dpi</span></button>
-            <button type="button" role="menuitem" data-format="dxf"><span>DXF</span><span class="fmt-note">CAD · capas</span></button>
-          </div>
+          <form class="export-panel" id="export-form">
+            <fieldset>
+              <legend>Formato</legend>
+              <label class="check-row"><input type="checkbox" name="format" value="pdf" /><span>PDF</span><span class="fmt-note">Impresión 1:1</span></label>
+              <label class="check-row"><input type="checkbox" name="format" value="png" /><span>PNG</span><span class="fmt-note">Imagen 1:1 · 102 dpi</span></label>
+              <label class="check-row"><input type="checkbox" name="format" value="dxf" /><span>DXF</span><span class="fmt-note">CAD · capas</span></label>
+              <label class="check-row"><input type="checkbox" name="format" value="svg" /><span>SVG</span><span class="fmt-note">Vector · cm</span></label>
+            </fieldset>
+            <fieldset>
+              <legend>Piezas</legend>
+              <label class="check-row"><input type="checkbox" name="piece" value="front" /><span>Delantero</span></label>
+              <label class="check-row"><input type="checkbox" name="piece" value="back" /><span>Espalda</span></label>
+            </fieldset>
+            <fieldset>
+              <legend>Contenido</legend>
+              <label class="check-row"><input type="checkbox" name="mold" /><span>Solo molde</span><span class="fmt-note">Solo contorno</span></label>
+              <div class="check-row">
+                <label class="check-label"><input type="checkbox" name="seam" /><span>Margen de costura</span></label>
+                <span class="seam-value"><input type="number" name="seamCm" min="0.3" max="5" step="0.1" aria-label="Margen de costura en cm" /><span class="unit">cm</span></span>
+              </div>
+            </fieldset>
+            <button type="submit">Descargar</button>
+          </form>
         </details>
         <button type="button" id="reset-btn" class="secondary">Restablecer medidas</button>
         <p class="status-line" id="status-line" role="status"></p>
@@ -88,7 +106,7 @@
 
       <footer class="archive-footer">
         <span>Matías Pezoa — Computación Avanzada 2026</span>
-        <span>Exporta PDF / PNG a escala 1:1 y DXF por capas</span>
+        <span>Exporta PDF / PNG / SVG a escala 1:1 y DXF por capas</span>
       </footer>
     </aside>
   </main>
@@ -104,6 +122,6 @@
       });
     }
   </script>
-  <script type="module" src="./script.js?v=4"></script>
+  <script type="module" src="./script.js?v=5"></script>
 </body>
 </html>

@@ -1,10 +1,11 @@
 // Las URLs de los módulos llevan ?v=N para no mezclar archivos viejos del caché
 // (GitHub Pages cachea 10 min). Subir N en todos los imports al cambiar un módulo.
-import { MEASUREMENT_GROUPS, defaultMeasurements } from "./measurements.js?v=4";
-import { buildBodice, mirrorToFullPiece } from "./bodice.js?v=4";
-import { renderBodiceSvg, renderRuler, fitScale } from "./render.js?v=4";
-import { buildDxf, downloadDxf } from "./dxf.js?v=4";
-import { buildSheet, sheetToSvg, sheetToPdf } from "./sheet.js?v=4";
+import { MEASUREMENT_GROUPS, defaultMeasurements } from "./measurements.js?v=5";
+import { buildBodice, mirrorToFullPiece } from "./bodice.js?v=5";
+import { renderBodiceSvg, renderRuler, fitScale } from "./render.js?v=5";
+import { buildDxf, downloadDxf } from "./dxf.js?v=5";
+import { buildSheet, sheetToSvg, sheetToVectorSvg, sheetToPdf } from "./sheet.js?v=5";
+import { prepareExportPiece, loadClipper } from "./exportPieces.js?v=5";
 
 // v2: la pinza de espalda pasó a 3 cm y centrada; se descartan medidas guardadas antes.
 const STORAGE_KEY = "patron-moda:measurements:v2";
@@ -16,6 +17,7 @@ const rulerWrap = document.getElementById("ruler-wrap");
 const mirrorToggle = document.getElementById("mirror-toggle");
 const resetBtn = document.getElementById("reset-btn");
 const exportMenu = document.getElementById("export-menu");
+const exportForm = document.getElementById("export-form");
 const statusLine = document.getElementById("status-line");
 const modeCaption = document.getElementById("mode-caption");
 const mat = document.getElementById("cutting-mat");
@@ -198,7 +200,7 @@ resetBtn.addEventListener("click", () => {
   buildForm();
   update();
 });
-// ---------- exportar (menú desplegable: DXF / PDF / PNG) ----------
+// ---------- exportar (menú desplegable con casillas: formato, piezas, contenido) ----------
 const PNG_PX_PER_CM = 40; // ~102 dpi
 const JSPDF_URL = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 let jsPdfPromise = null;
@@ -229,12 +231,68 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function currentSheet() {
-  const pieces = currentPieces();
+// ---------- opciones de exportación (casillas) ----------
+const EXPORT_KEY = "patron-moda:export:v1";
+const EXPORT_DEFAULTS = { format: ["pdf"], piece: ["front", "back"], mold: false, seam: false, seamCm: 1 };
+
+function loadExportOptions() {
+  try {
+    return { ...EXPORT_DEFAULTS, ...JSON.parse(localStorage.getItem(EXPORT_KEY) ?? "{}") };
+  } catch {
+    return { ...EXPORT_DEFAULTS };
+  }
+}
+
+function applyExportOptions(opts) {
+  for (const box of exportForm.querySelectorAll('[name="format"]')) box.checked = opts.format.includes(box.value);
+  for (const box of exportForm.querySelectorAll('[name="piece"]')) box.checked = opts.piece.includes(box.value);
+  exportForm.elements.mold.checked = opts.mold;
+  exportForm.elements.seam.checked = opts.seam;
+  exportForm.elements.seamCm.value = opts.seamCm;
+  exportForm.elements.seamCm.disabled = !opts.seam;
+}
+
+function readExportOptions() {
+  const checked = (name) => [...exportForm.querySelectorAll(`[name="${name}"]:checked`)].map((b) => b.value);
+  const seamInput = exportForm.elements.seamCm;
+  return {
+    format: checked("format"),
+    piece: checked("piece"),
+    mold: exportForm.elements.mold.checked,
+    seam: exportForm.elements.seam.checked,
+    seamCm: clamp(Number(seamInput.value), Number(seamInput.min), Number(seamInput.max)),
+  };
+}
+
+function saveExportOptions(opts) {
+  try {
+    localStorage.setItem(EXPORT_KEY, JSON.stringify(opts));
+  } catch {
+    // no es crítico
+  }
+}
+
+// Piezas elegidas, ya preparadas (aplanadas y, si corresponde, con margen).
+async function exportPieces(opts) {
+  const seam = opts.seam ? opts.seamCm : 0;
+  const ClipperLib = seam ? await loadClipper() : null;
+  const all = currentPieces();
+  return opts.piece.map((id) => prepareExportPiece(all[id], { seam, ClipperLib }));
+}
+
+function exportFileName(opts, ext) {
+  const pieces = opts.piece.map((id) => (id === "front" ? "delantero" : "espalda")).join("-");
+  const parts = ["patron", pieces, mirrorToggle.checked ? "completo" : "mitad"];
+  if (opts.mold) parts.push("molde");
+  if (opts.seam) parts.push(`costura-${String(opts.seamCm).replace(".", "_")}cm`);
+  return `${parts.join("-")}.${ext}`;
+}
+
+function exportSheet(pieces, opts) {
   const m = measurements;
   const subtitle = `Busto ${m.bust} - Cintura ${m.waist} - Cadera ${m.hip} - Talle del. ${m.frontWaistLength} / esp. ${m.backWaistLength} cm` +
     (mirrorToggle.checked ? " - pieza completa" : " - mitad (doblar en el centro)");
-  return buildSheet(pieces, { title: "CUERPO BASE", subtitle });
+  return buildSheet(pieces, { title: "CUERPO BASE", subtitle, mold: opts.mold, seam: opts.seam ? opts.seamCm : 0 });
 }
 
 // CRC-32 para el chunk pHYs del PNG.
@@ -270,8 +328,8 @@ async function withPngResolution(blob, pxPerCm) {
   return new Blob([out], { type: "image/png" });
 }
 
-async function exportPng() {
-  const svg = sheetToSvg(currentSheet(), PNG_PX_PER_CM);
+async function exportPng(sheet, filename) {
+  const svg = sheetToSvg(sheet, PNG_PX_PER_CM);
   const img = new Image();
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   try {
@@ -285,37 +343,45 @@ async function exportPng() {
     canvas.height = img.height;
     canvas.getContext("2d").drawImage(img, 0, 0);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-    downloadBlob(await withPngResolution(blob, PNG_PX_PER_CM), "patron-cuerpo-base.png");
+    downloadBlob(await withPngResolution(blob, PNG_PX_PER_CM), filename);
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-async function exportPdf() {
+async function exportPdf(sheet, filename) {
   const jsPDF = await loadJsPdf();
-  sheetToPdf(currentSheet(), jsPDF).save("patron-cuerpo-base.pdf");
+  sheetToPdf(sheet, jsPDF).save(filename);
 }
 
-function exportDxf() {
-  const pieces = currentPieces();
-  downloadDxf(buildDxf([pieces.front, pieces.back]), "patron-cuerpo-base.dxf");
+function exportSvg(sheet, filename) {
+  downloadBlob(new Blob([sheetToVectorSvg(sheet)], { type: "image/svg+xml" }), filename);
 }
 
 const EXPORTERS = {
-  dxf: [exportDxf, "DXF generado."],
-  pdf: [exportPdf, "PDF generado (escala 1:1)."],
-  png: [exportPng, `PNG generado (escala 1:1, ${Math.round(PNG_PX_PER_CM * 2.54)} dpi).`],
+  pdf: (pieces, opts, name) => exportPdf(exportSheet(pieces, opts), name),
+  png: (pieces, opts, name) => exportPng(exportSheet(pieces, opts), name),
+  svg: (pieces, opts, name) => exportSvg(exportSheet(pieces, opts), name),
+  dxf: (pieces, opts, name) => downloadDxf(buildDxf(pieces, { mold: opts.mold }), name),
 };
 
-exportMenu.addEventListener("click", async (e) => {
-  const btn = e.target.closest("[data-format]");
-  if (!btn) return;
-  exportMenu.open = false;
-  const [run, done] = EXPORTERS[btn.dataset.format];
+applyExportOptions(loadExportOptions());
+exportForm.addEventListener("change", () => {
+  exportForm.elements.seamCm.disabled = !exportForm.elements.seam.checked;
+  saveExportOptions(readExportOptions());
+});
+
+exportForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const opts = readExportOptions();
+  exportForm.elements.seamCm.value = opts.seamCm;
+  if (!opts.format.length) return void (statusLine.textContent = "Elige al menos un formato.");
+  if (!opts.piece.length) return void (statusLine.textContent = "Elige al menos una pieza.");
   statusLine.textContent = "Generando…";
   try {
-    await run();
-    statusLine.textContent = done;
+    const pieces = await exportPieces(opts);
+    for (const fmt of opts.format) await EXPORTERS[fmt](pieces, opts, exportFileName(opts, fmt));
+    statusLine.textContent = `Descargado: ${opts.format.map((f) => f.toUpperCase()).join(", ")}.`;
   } catch (err) {
     statusLine.textContent = `Error al exportar: ${err.message}`;
   }

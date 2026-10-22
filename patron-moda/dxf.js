@@ -71,8 +71,9 @@ const TABLES =
   `0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0\n` +
   `0\nLTYPE\n2\nDASHED\n70\n0\n3\nDashed line\n72\n65\n73\n2\n40\n0.75\n49\n0.5\n74\n0\n49\n-0.25\n74\n0\n` +
   `0\nENDTAB\n` +
-  `0\nTABLE\n2\nLAYER\n70\n4\n` +
+  `0\nTABLE\n2\nLAYER\n70\n5\n` +
   `0\nLAYER\n2\nCORTE\n70\n0\n62\n7\n6\nCONTINUOUS\n` +
+  `0\nLAYER\n2\nCOSTURA\n70\n0\n62\n5\n6\nDASHED\n` +
   `0\nLAYER\n2\nPINZAS\n70\n0\n62\n1\n6\nCONTINUOUS\n` +
   `0\nLAYER\n2\nGUIAS\n70\n0\n62\n8\n6\nDASHED\n` +
   `0\nLAYER\n2\nETIQUETAS\n70\n0\n62\n7\n6\nCONTINUOUS\n` +
@@ -80,37 +81,39 @@ const TABLES =
   `0\nENDSEC\n`;
 
 /**
- * Capas: CORTE (contorno cerrado), PINZAS, GUIAS (doblez y línea de cintura), ETIQUETAS.
+ * @param {object[]} pieces piezas preparadas por exportPieces.js
+ * @param {{gap?: number, mold?: boolean}} opts mold: "solo molde", únicamente la capa CORTE
+ * Capas: CORTE (contorno cerrado, con margen si lo hay), COSTURA (línea de
+ * costura, solo con margen), PINZAS, GUIAS (doblez y línea de cintura), ETIQUETAS.
  */
-export function buildDxf(pieces, { gap = 10 } = {}) {
+export function buildDxf(pieces, { gap = 10, mold = false } = {}) {
   handleCounter = 0x40;
   const entities = [];
   let cursorX = 0;
-  // Las piezas se alinean por la línea de cintura (W.y): en el DXF la cintura
-  // de todas queda a la misma altura, `waistY`, y nada baja de y = 0.
-  const waistOf = (p) => p.points?.W?.y ?? p.bounds.minY;
-  const waistY = Math.max(...pieces.map((p) => p.bounds.maxY - waistOf(p)));
+  // Las piezas se alinean por la línea de cintura: en el DXF la cintura de
+  // todas queda a la misma altura, `waistY`, y nada baja de y = 0.
+  const waistY = Math.max(...pieces.map((p) => p.bounds.maxY - p.waistY));
 
   for (const piece of pieces) {
     const b = piece.bounds;
     const offsetX = cursorX - b.minX;
-    const offsetY = waistOf(piece) + waistY;
+    const offsetY = piece.waistY + waistY;
     cursorX += b.width + gap;
+    const tr = (points) => transformPoints(points, offsetX, offsetY);
 
-    const foldSegs = piece.centerLine ?? piece.outline.filter((s) => s.fold);
-    entities.push(lwpolyline(transformPoints(flattenChain(piece.outline), offsetX, offsetY), { layer: "CORTE", closed: true }));
+    entities.push(lwpolyline(tr(piece.loop), { layer: "CORTE", closed: true }));
+    if (mold) continue;
 
-    if (foldSegs.length) {
-      entities.push(lwpolyline(transformPoints(flattenChain(foldSegs), offsetX, offsetY), { layer: "GUIAS" }));
-    }
+    if (piece.stitch) entities.push(lwpolyline(tr(piece.stitch), { layer: "COSTURA", closed: piece.stitchClosed }));
+    if (piece.fold) entities.push(lwpolyline(tr(piece.fold), { layer: "GUIAS" }));
     for (const guide of piece.guides) {
-      entities.push(lwpolyline(transformPoints(guide.points, offsetX, offsetY), { layer: "GUIAS" }));
+      entities.push(lwpolyline(tr(guide.points), { layer: "GUIAS" }));
     }
     for (const dart of piece.darts) {
-      entities.push(lwpolyline(transformPoints(dart.points, offsetX, offsetY), { layer: "PINZAS", closed: !!dart.closed }));
+      entities.push(lwpolyline(tr(dart.points), { layer: "PINZAS", closed: !!dart.closed }));
     }
 
-    const labelPt = transformPoints([{ x: b.minX, y: b.minY - 2 }], offsetX, offsetY)[0];
+    const labelPt = tr([{ x: b.minX, y: b.minY - 2 }])[0];
     entities.push(textEntity(piece.label, labelPt.x, labelPt.y));
   }
 
