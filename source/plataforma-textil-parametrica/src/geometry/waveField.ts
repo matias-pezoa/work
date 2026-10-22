@@ -104,6 +104,19 @@ export interface WaveFieldParams {
   ribAngleDeg: number
   /** Cuanto doblan los atractores a las costillas (0 = rectas paralelas, 1 = siguen al atractor). */
   flowStrength: number
+  /**
+   * Como se orientan las costillas respecto de una curva atractora:
+   * 'across' = perpendiculares (la cruzan, como peldanos), 'along' = la
+   * acompanan, corriendo a lo largo de ella.
+   */
+  curveRibs: CurveRibs
+}
+
+export type CurveRibs = 'across' | 'along'
+
+export const CURVE_RIBS_LABELS: Record<CurveRibs, string> = {
+  across: 'Perpendiculares a la curva',
+  along: 'A lo largo de la curva',
 }
 
 export const DEFAULT_WAVE_FIELD: WaveFieldParams = {
@@ -117,6 +130,7 @@ export const DEFAULT_WAVE_FIELD: WaveFieldParams = {
   combine: 'max',
   ribAngleDeg: 90,
   flowStrength: 1,
+  curveRibs: 'across',
 }
 
 export const WAVE_UI_PARAMS: readonly NumberParam[] = [
@@ -371,14 +385,16 @@ function resolveDomain(planeSize: number, boundary?: Boundary | null): Domain {
  *     maxima de un atractor), para que lejos de todo mande la base y cerca de
  *     un atractor mande el atractor;
  *   - por atractor, con peso = su envolvente * `flowStrength`: el angulo
- *     propio de un punto (`angleDeg`), o la tangente de una curva en su punto
- *     mas cercano — asi las costillas corren a lo largo de la curva.
+ *     propio de un punto (`angleDeg`), o la direccion de una curva en su
+ *     punto mas cercano: perpendicular a la tangente (`curveRibs` 'across',
+ *     las costillas cruzan la curva) o la tangente misma ('along', corren a
+ *     lo largo de ella).
  */
 export function flowDirection(
   x: number,
   z: number,
   attractors: readonly Attractor[],
-  params: Pick<WaveFieldParams, 'ribAngleDeg' | 'flowStrength'>,
+  params: Pick<WaveFieldParams, 'ribAngleDeg' | 'flowStrength' | 'curveRibs'>,
 ): Vec2 {
   const flow = clamp(params.flowStrength, 0, 1)
   const base = params.ribAngleDeg * DEG2RAD
@@ -395,7 +411,7 @@ export function flowDirection(
       } else {
         const f = curveFrame2D(x, z, a)
         d = f.d
-        theta = Math.atan2(f.tz, f.tx)
+        theta = Math.atan2(f.tz, f.tx) + (params.curveRibs === 'along' ? 0 : Math.PI / 2)
       }
       const env =
         falloff(a.falloff, d, a.radius) * Math.min(1, Math.abs(a.strength)) * flow

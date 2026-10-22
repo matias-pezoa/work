@@ -7,7 +7,11 @@
 import { create } from 'zustand'
 import * as THREE from 'three'
 import { DEFAULT_SPIKE_FIELD, type SpikeFieldParams } from '../geometry/spikeField'
-import { DEFAULT_WAVE_FIELD, type WaveFieldParams } from '../geometry/waveField'
+import {
+  DEFAULT_WAVE_FIELD,
+  type CurveRibs,
+  type WaveFieldParams,
+} from '../geometry/waveField'
 import {
   DEFAULT_LASER,
   LASER_MATERIALS,
@@ -32,7 +36,7 @@ export type GizmoMode = 'translate' | 'rotate'
 /** Campos numericos de SpikeFieldParams editables desde la UI. */
 export type FieldNumericKey = Exclude<keyof SpikeFieldParams, 'combine' | 'alignToField'>
 /** Campos numericos de WaveFieldParams editables desde la UI. */
-export type WaveNumericKey = Exclude<keyof WaveFieldParams, 'combine'>
+export type WaveNumericKey = Exclude<keyof WaveFieldParams, 'combine' | 'curveRibs'>
 
 /**
  * Base personalizada importada (p. ej. una pieza de patron), compartida entre
@@ -93,6 +97,7 @@ export interface AppState {
 
   setWaveParam: (key: WaveNumericKey, value: number) => void
   setWaveCombine: (mode: CombineMode) => void
+  setWaveCurveRibs: (curveRibs: CurveRibs) => void
   addWaveAttractor: (position: [number, number, number]) => void
   addWaveAttractorCurve: (points: readonly [number, number, number][]) => void
   updateWaveAttractor: (id: string, patch: AttractorPatch) => void
@@ -278,6 +283,8 @@ export const useAppStore = create<AppState>((set) => ({
   setWaveParam: (key, value) => set((s) => ({ wave: { ...s.wave, [key]: value } })),
 
   setWaveCombine: (combine) => set((s) => ({ wave: { ...s.wave, combine } })),
+
+  setWaveCurveRibs: (curveRibs) => set((s) => ({ wave: { ...s.wave, curveRibs } })),
 
   addWaveAttractor: (position) =>
     set((s) => {

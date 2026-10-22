@@ -253,8 +253,10 @@ discretas).
   `flowDirection(x, z)`. El campo mezcla en "angulo doble" (una costilla es un
   eje: 0 y 180 son lo mismo) la direccion base `ribAngleDeg` (peso
   `1 - envolvente maxima`, piso `BASE_FLOW_FLOOR`) con, por atractor (peso =
-  envolvente * `flowStrength`), el `angleDeg` de un punto o la tangente de una
-  curva en su punto mas cercano (`curveFrame2D`). Sin atractores o con
+  envolvente * `flowStrength`), el `angleDeg` de un punto o, para una curva en
+  su punto mas cercano (`curveFrame2D`), la normal (`curveRibs: 'across'`,
+  POR DEFECTO: las costillas cruzan la curva — lo que pidio el usuario) o la
+  tangente (`'along'`: la acompanan; opcion). Sin atractores o con
   `flowStrength` 0 = el peine de rectas paralelas de antes (test).
 - Factibilidad: una linea se corta si se acerca a otra (o a si misma) a menos
   de `minDist = max(spacing/2, espesor + RIB_GAP_MM)` — entre caras siempre

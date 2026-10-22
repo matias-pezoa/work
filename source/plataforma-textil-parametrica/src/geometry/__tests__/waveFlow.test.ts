@@ -25,13 +25,25 @@ describe('flowDirection: hacia donde corren las costillas', () => {
   it('sin atractores sigue la direccion base del panel', () => {
     expect(
       axisDiff(
-        axisDeg(flowDirection(3, 4, [], { ribAngleDeg: 90, flowStrength: 1 })),
+        axisDeg(
+          flowDirection(3, 4, [], {
+            ribAngleDeg: 90,
+            flowStrength: 1,
+            curveRibs: 'across',
+          }),
+        ),
         90,
       ),
     ).toBeLessThan(1e-6)
     expect(
       axisDiff(
-        axisDeg(flowDirection(3, 4, [], { ribAngleDeg: 30, flowStrength: 1 })),
+        axisDeg(
+          flowDirection(3, 4, [], {
+            ribAngleDeg: 30,
+            flowStrength: 1,
+            curveRibs: 'across',
+          }),
+        ),
         30,
       ),
     ).toBeLessThan(1e-6)
@@ -39,33 +51,58 @@ describe('flowDirection: hacia donde corren las costillas', () => {
 
   it('junto a un punto rotado toma el angulo del punto', () => {
     const p = createAttractor(new THREE.Vector3(0, 3, 0), { radius: 10, angleDeg: 35 })
-    const dir = flowDirection(0.2, 0.1, [p], { ribAngleDeg: 90, flowStrength: 1 })
+    const dir = flowDirection(0.2, 0.1, [p], {
+      ribAngleDeg: 90,
+      flowStrength: 1,
+      curveRibs: 'across',
+    })
     expect(axisDiff(axisDeg(dir), 35)).toBeLessThan(3)
   })
 
-  it('junto a una curva corre a lo largo de ella (tangente)', () => {
-    // curva recta en diagonal a 45 grados, base perpendicular (135)
-    const c = createCurveAttractor(
-      [new THREE.Vector3(-5, 3, -5), new THREE.Vector3(5, 3, 5)],
-      {
-        radius: 4,
-        falloff: 'linear',
-      },
-    )
-    const dir = flowDirection(0.3, -0.3, [c], { ribAngleDeg: 135, flowStrength: 1 })
+  // curva recta en diagonal a 45 grados
+  const diagonal = () =>
+    createCurveAttractor([new THREE.Vector3(-5, 3, -5), new THREE.Vector3(5, 3, 5)], {
+      radius: 4,
+      falloff: 'linear',
+    })
+
+  it('por defecto, junto a una curva la cruza (perpendicular a la tangente)', () => {
+    // base a 45 (paralela a la curva) para que el cambio venga de la curva
+    const dir = flowDirection(0.3, -0.3, [diagonal()], {
+      ribAngleDeg: 45,
+      flowStrength: 1,
+      curveRibs: 'across',
+    })
+    expect(axisDiff(axisDeg(dir), 135)).toBeLessThan(5)
+  })
+
+  it('opcion "a lo largo": junto a una curva corre por su tangente', () => {
+    const dir = flowDirection(0.3, -0.3, [diagonal()], {
+      ribAngleDeg: 135,
+      flowStrength: 1,
+      curveRibs: 'along',
+    })
     expect(axisDiff(axisDeg(dir), 45)).toBeLessThan(5)
   })
 
   it('con flujo en 0 los atractores no doblan las costillas', () => {
     const p = createAttractor(new THREE.Vector3(0, 3, 0), { radius: 10, angleDeg: 0 })
-    const dir = flowDirection(0, 0, [p], { ribAngleDeg: 90, flowStrength: 0 })
+    const dir = flowDirection(0, 0, [p], {
+      ribAngleDeg: 90,
+      flowStrength: 0,
+      curveRibs: 'across',
+    })
     expect(axisDiff(axisDeg(dir), 90)).toBeLessThan(1e-6)
   })
 
   it('0 y 180 grados son el mismo eje (no se anulan entre si)', () => {
     const a = createAttractor(new THREE.Vector3(-0.1, 3, 0), { radius: 10, angleDeg: 10 })
     const b = createAttractor(new THREE.Vector3(0.1, 3, 0), { radius: 10, angleDeg: 190 })
-    const dir = flowDirection(0, 0, [a, b], { ribAngleDeg: 90, flowStrength: 1 })
+    const dir = flowDirection(0, 0, [a, b], {
+      ribAngleDeg: 90,
+      flowStrength: 1,
+      curveRibs: 'across',
+    })
     expect(axisDiff(axisDeg(dir), 10)).toBeLessThan(5)
   })
 })
@@ -115,7 +152,27 @@ describe('costillas como lineas de flujo', () => {
     )
   })
 
-  it('una curva dobla las costillas: dejan de ser rectas', () => {
+  it('cruzando una curva curvada, las costillas se abren en abanico (dejan de ser paralelas)', () => {
+    // arco en X; base 0 (en X): lejos corren en X, cerca de la curva la cruzan
+    const arc = createCurveAttractor(
+      [
+        new THREE.Vector3(-8, 3, 0),
+        new THREE.Vector3(0, 3, 3),
+        new THREE.Vector3(8, 3, 0),
+      ],
+      { radius: 5, falloff: 'linear', smooth: [true] },
+    )
+    const res = buildWaveField([arc], { ...base, ribAngleDeg: 0 })
+    // alguna costilla corre en Z (cruzando el arco), no solo en X
+    const spanZ = Math.max(
+      ...res.ribLines.map(
+        (l) => Math.max(...l.map((p) => p[1])) - Math.min(...l.map((p) => p[1])),
+      ),
+    )
+    expect(spanZ).toBeGreaterThan(1)
+  })
+
+  it('opcion "a lo largo": una curva dobla las costillas siguiendola', () => {
     const c = createCurveAttractor(
       [
         new THREE.Vector3(-8, 3, 0),
@@ -124,8 +181,8 @@ describe('costillas como lineas de flujo', () => {
       ],
       { radius: 5, falloff: 'linear', smooth: [true] },
     )
-    const straight = buildWaveField([c], { ...base, flowStrength: 0 })
-    const bent = buildWaveField([c], base)
+    const straight = buildWaveField([c], { ...base, flowStrength: 0, curveRibs: 'along' })
+    const bent = buildWaveField([c], { ...base, curveRibs: 'along' })
     const maxDeviation = (lines: (readonly [number, number])[][]) =>
       Math.max(
         ...lines.map(

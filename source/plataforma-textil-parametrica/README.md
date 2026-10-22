@@ -104,7 +104,8 @@ modo.
 
 **Dirección.** Las costillas no son un peine fijo: **fluyen** siguiendo los
 atractores. Lejos de todo corren en la "Dirección base de costillas"; cerca de
-una curva corren a lo largo de ella; cerca de un punto toman su **dirección**
+una curva la **cruzan perpendiculares** (o, con la opción "A lo largo de la
+curva", la acompañan); cerca de un punto toman su **dirección**
 (slider en el panel, o **tecla R** para rotar el punto con el gizmo; la barra
 del punto la muestra). "Flujo" en 0 vuelve a rectas paralelas. Dos costillas
 nunca se acercan a menos de su espesor + aire: si convergen, una se corta.

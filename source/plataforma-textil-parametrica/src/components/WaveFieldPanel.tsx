@@ -12,7 +12,8 @@ import {
   MIN_SPACING_MM,
   MIN_WAVELENGTH_MM,
 } from '../geometry/waveField'
-import type { WaveFieldResult } from '../geometry/waveField'
+import { CURVE_RIBS_LABELS } from '../geometry/waveField'
+import type { CurveRibs, WaveFieldResult } from '../geometry/waveField'
 import { downloadStl } from '../io/exportSTL'
 import { mmToThree, threeToMm } from '../utils/units'
 
@@ -24,6 +25,7 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
   const wave = useAppStore((s) => s.wave)
   const setWaveParam = useAppStore((s) => s.setWaveParam)
   const setWaveCombine = useAppStore((s) => s.setWaveCombine)
+  const setWaveCurveRibs = useAppStore((s) => s.setWaveCurveRibs)
 
   const attractorSet = useAttractorSet('wave')
   const baseShape = useAppStore((s) => s.baseShape)
@@ -97,6 +99,19 @@ export function WaveFieldPanel({ result }: WaveFieldPanelProps) {
           >
             Campo: suma
           </button>
+        </div>
+        <label className="param-label">Costillas frente a las curvas</label>
+        <div className="seg">
+          {(Object.keys(CURVE_RIBS_LABELS) as CurveRibs[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={wave.curveRibs === k ? 'active' : ''}
+              onClick={() => setWaveCurveRibs(k)}
+            >
+              {CURVE_RIBS_LABELS[k]}
+            </button>
+          ))}
         </div>
       </section>
 
