@@ -8,9 +8,9 @@ Portafolio de experimentos y trabajos en diseño, moda, tecnología y fabricaci�
 
 ```text
 .
-├── index.html               ← home: índice WORK, perfil y contacto
+├── index.html               ← home: índice WORK, perfil, intereses y contacto
 ├── styles.css               ← sistema gráfico compartido (Oswald + JetBrains Mono)
-├── assets/                  ← imágenes y modelo 3D de la home
+├── assets/                  ← imágenes de la home
 ├── <trabajo>/               ← cada trabajo en su carpeta, servido en /work/<trabajo>/
 │   ├── patron-moda/
 │   ├── lo-que-queda/
