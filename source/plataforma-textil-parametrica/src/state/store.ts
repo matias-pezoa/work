@@ -71,6 +71,8 @@ export interface AppState {
   /** Atractores propios del modo, siempre sobre el plano (y = 0). */
   laserAttractors: Attractor[]
   selectedLaserAttractorId: string | null
+  /** Familia capas: la vista muestra las piezas en la cama en vez del diseno. */
+  laserPreviewBed: boolean
 
   /**
    * Punto de control seleccionado del atractor seleccionado del modo activo
@@ -105,10 +107,13 @@ export interface AppState {
   selectWaveAttractor: (id: string | null, pointIndex?: number | null) => void
 
   setLaserParam: (key: LaserNumericKey, value: number) => void
+  /** Opciones no numericas del modo laser (patron, disposicion, simetria...). */
+  setLaserOption: <K extends keyof LaserParams>(key: K, value: LaserParams[K]) => void
   setLaserFamily: (family: LaserFamily) => void
   setLaserMaterial: (materialId: string) => void
   setLaserCombine: (mode: CombineMode) => void
   toggleLaserAlign: () => void
+  setLaserPreviewBed: (on: boolean) => void
   addLaserAttractor: (position: [number, number, number]) => void
   addLaserAttractorCurve: (points: readonly [number, number, number][]) => void
   updateLaserAttractor: (id: string, patch: AttractorPatch) => void
@@ -226,6 +231,7 @@ export const useAppStore = create<AppState>((set) => ({
   laser: { ...DEFAULT_LASER },
   laserAttractors: initialLaserAttractors(),
   selectedLaserAttractorId: null,
+  laserPreviewBed: false,
   selectedPointIndex: null,
   gizmoMode: 'translate',
 
@@ -329,7 +335,22 @@ export const useAppStore = create<AppState>((set) => ({
 
   setLaserParam: (key, value) => set((s) => ({ laser: { ...s.laser, [key]: value } })),
 
-  setLaserFamily: (family) => set((s) => ({ laser: { ...s.laser, family } })),
+  setLaserOption: (key, value) => set((s) => ({ laser: { ...s.laser, [key]: value } })),
+
+  // bisagra y modulo se piensan para TODA la pieza: al entrar, si la
+  // distribucion era "solo con campo", pasa a "toda la pieza" (el campo
+  // sigue modulando). Se puede volver a cambiar en el panel.
+  setLaserFamily: (family) =>
+    set((s) => ({
+      laser: {
+        ...s.laser,
+        family,
+        distribution:
+          (family === 'hinge' || family === 'module') && s.laser.distribution === 'field'
+            ? 'full'
+            : s.laser.distribution,
+      },
+    })),
 
   setLaserMaterial: (materialId) =>
     set((s) => {
@@ -344,6 +365,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleLaserAlign: () =>
     set((s) => ({ laser: { ...s.laser, alignToField: !s.laser.alignToField } })),
+
+  setLaserPreviewBed: (laserPreviewBed) => set({ laserPreviewBed }),
 
   addLaserAttractor: (position) =>
     set((s) => {
@@ -430,6 +453,7 @@ export const useAppStore = create<AppState>((set) => ({
       laser: { ...DEFAULT_LASER },
       laserAttractors: initialLaserAttractors(),
       selectedLaserAttractorId: null,
+      laserPreviewBed: false,
       selectedPointIndex: null,
       gizmoMode: 'translate',
     }),

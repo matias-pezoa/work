@@ -18,7 +18,8 @@ import { LaserPanel } from './components/LaserPanel'
 import { buildSpikeField } from './geometry/spikeField'
 import type { SpikePlacement } from './geometry/spikeField'
 import { buildWaveField } from './geometry/waveField'
-import { buildLaserCut } from './geometry/laserCut'
+import { buildLaserCut, type LaserCutResult } from './geometry/laserCut'
+import { layoutOnBed, type BedLayout } from './geometry/laserBed'
 import { threeToMm } from './utils/units'
 import {
   attractorSetFrom,
@@ -39,6 +40,8 @@ export default function App() {
   const laser = useLaserCut(mode === 'laser', spikes.placements)
   const laserFamily = useAppStore((s) => s.laser.family)
   const laserSet = useAttractorSet('laser')
+  const bed = useLaserBed(laser)
+  const previewBed = useAppStore((s) => s.laserPreviewBed) && bed !== null
   useDeleteShortcut(mode === 'laser' && laserFamily === 'footprint' ? null : mode)
 
   return (
@@ -58,8 +61,26 @@ export default function App() {
       </header>
 
       <main className="viewport">
-        {mode === 'laser' && laser ? (
-          <LaserView result={laser} set={laserFamily === 'footprint' ? null : laserSet} />
+        {mode === 'laser' && laser && previewBed && bed ? (
+          // key propia: el zoom/encuadre de la cama no se arrastra a la vista de diseno.
+          <LaserView
+            key="bed"
+            result={{
+              ...laser,
+              paths: bed.paths,
+              bounds: bed.bounds,
+              sheet: { outer: [], holes: [] },
+              labels: bed.labels,
+            }}
+            frames={bed.frames}
+            set={null}
+          />
+        ) : mode === 'laser' && laser ? (
+          <LaserView
+            key="design"
+            result={laser}
+            set={laserFamily === 'footprint' ? null : laserSet}
+          />
         ) : (
           <Viewport>
             {mode === 'volume' && (
@@ -121,7 +142,7 @@ export default function App() {
         {mode === 'volume' && <SpikeFieldPanel result={spikes} />}
         {mode === 'wave' && <WaveFieldPanel result={waves} />}
         {mode === 'laser' && laser && (
-          <LaserPanel result={laser} spikeCount={spikes.placements.length} />
+          <LaserPanel result={laser} bed={bed} spikeCount={spikes.placements.length} />
         )}
       </aside>
     </div>
@@ -195,6 +216,27 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
       footprintPlaneMm: threeToMm(spikePlaneSize),
     })
   }, [active, laser, attractors, baseShape, placements, spikePlaneSize])
+}
+
+/** Familia capas: cada capa como pieza suelta, distribuida en la cama del laser. */
+function useLaserBed(result: LaserCutResult | null): BedLayout | null {
+  const laser = useAppStore((s) => s.laser)
+  return useMemo(() => {
+    if (!result || laser.family !== 'layers' || result.pieces.length === 0) return null
+    return layoutOnBed(result.pieces, {
+      widthMm: laser.bedWidthMm,
+      heightMm: laser.bedHeightMm,
+      gapMm: laser.bedGapMm,
+      labelMm: laser.bedLabelMm,
+    })
+  }, [
+    result,
+    laser.family,
+    laser.bedWidthMm,
+    laser.bedHeightMm,
+    laser.bedGapMm,
+    laser.bedLabelMm,
+  ])
 }
 
 function useSpikeField() {

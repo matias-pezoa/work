@@ -19,7 +19,9 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import * as THREE from 'three'
 import { curvePath } from '../geometry/attractionField'
 import { addAtPoint, type AttractorSet } from '../state/attractorSets'
-import { LAYER_ORDER } from '../geometry/laserCut'
+import { ELEMENT_FAMILIES, LAYER_ORDER } from '../geometry/laserCut'
+import { symmetryAxes } from '../geometry/laserPattern'
+import { useAppStore } from '../state/store'
 import type { LaserCutResult } from '../geometry/laserCut'
 import type { Vec2 } from '../geometry/polygon'
 import { pathData } from '../io/exportLaser'
@@ -27,8 +29,10 @@ import { mmToThree, threeToMm } from '../utils/units'
 
 interface LaserViewProps {
   result: LaserCutResult
-  /** null = la familia no usa atractores (huella de puas). */
+  /** null = la familia no usa atractores (huella de puas) o se ve la cama. */
   set: AttractorSet | null
+  /** Marcos de la cama del laser (vista previa de piezas). */
+  frames?: readonly (readonly Vec2[])[]
 }
 
 /** Aire alrededor de la pieza al encuadrar, en mm. */
@@ -38,9 +42,10 @@ const HANDLE_PX = 7
 
 type Drag =
   | { kind: 'attractor'; id: string; index: number }
+  | { kind: 'center' }
   | { kind: 'pan'; clientX: number; clientY: number; center: Vec2 }
 
-export function LaserView({ result, set }: LaserViewProps) {
+export function LaserView({ result, set, frames = [] }: LaserViewProps) {
   const attractors = set?.attractors ?? null
   const selectedId = set?.selectedId ?? null
   const selectedPointIndex = set?.selectedPointIndex ?? null
@@ -49,6 +54,17 @@ export function LaserView({ result, set }: LaserViewProps) {
   const [size, setSize] = useState({ w: 800, h: 600 })
   const [zoom, setZoom] = useState(1)
   const [center, setCenter] = useState<Vec2 | null>(null)
+
+  const laser = useAppStore((s) => s.laser)
+  const setLaserParam = useAppStore((s) => s.setLaserParam)
+  const showCenter =
+    set !== null &&
+    ((ELEMENT_FAMILIES.has(laser.family) && laser.layout === 'radial') ||
+      (laser.family === 'layers' && laser.layerJoin === 'center') ||
+      laser.symmetry !== 'none')
+  const axes = symmetryAxes(laser.symmetry, laser.symmetryOrder)
+  // copias por simetria: se dibujan punteadas y no se editan.
+  const ghosts = set ? result.fieldAttractors.filter((a) => a.id.includes('~')) : []
 
   const { minX, maxX, minZ, maxZ } = result.bounds
   const fitCenter: Vec2 = [(minX + maxX) / 2, (minZ + maxZ) / 2]
@@ -114,6 +130,13 @@ export function LaserView({ result, set }: LaserViewProps) {
         d.center[0] - (e.clientX - d.clientX) * mmPerPx,
         d.center[1] - (e.clientY - d.clientY) * mmPerPx,
       ])
+      return
+    }
+    if (d.kind === 'center') {
+      const [x, z] = toMm(e.clientX, e.clientY)
+      // el centro se guarda como desplazamiento desde el centro de la pieza.
+      setLaserParam('centerXMm', Math.round(laser.centerXMm + x - result.center[0]))
+      setLaserParam('centerZMm', Math.round(laser.centerZMm + z - result.center[1]))
       return
     }
     const a = attractors?.find((at) => at.id === d.id)
@@ -193,8 +216,90 @@ export function LaserView({ result, set }: LaserViewProps) {
       <path d={sheetD} className="laser-sheet" fillRule="evenodd" />
       <path d={sheetD} fill="url(#laser-grid)" fillRule="evenodd" />
 
+      {frames.map((f, k) => (
+        <path
+          key={k}
+          d={pathData({ layer: 'contorno', points: [...f], closed: true })}
+          className="laser-bed-frame"
+        />
+      ))}
+
       {layerPaths.map(({ layer, d }) =>
         d ? <path key={layer} d={d} className={`laser-cut laser-cut-${layer}`} /> : null,
+      )}
+
+      {result.labels.map((l, k) => (
+        <text
+          key={k}
+          x={l.x}
+          y={l.z}
+          fontSize={l.sizeMm}
+          textAnchor={l.anchor ?? 'middle'}
+          dominantBaseline={l.anchor ? 'auto' : 'central'}
+          className="laser-label"
+        >
+          {l.text}
+        </text>
+      ))}
+
+      {ghosts.map((a) =>
+        a.kind === 'point' ? (
+          <circle
+            key={a.id}
+            cx={threeToMm(a.position.x)}
+            cy={threeToMm(a.position.z)}
+            r={threeToMm(a.radius)}
+            className="laser-attr-ghost"
+          />
+        ) : (
+          <polyline
+            key={a.id}
+            points={curvePath(a)
+              .map((p) => `${threeToMm(p.x)},${threeToMm(p.z)}`)
+              .join(' ')}
+            className="laser-attr-ghost"
+          />
+        ),
+      )}
+
+      {showCenter && (
+        <g className="laser-center">
+          {axes.map((ang, k) => {
+            const L = 4 * (maxX - minX + maxZ - minZ)
+            const [cx, cz] = result.center
+            return (
+              <line
+                key={k}
+                x1={cx - Math.cos(ang) * L}
+                y1={cz - Math.sin(ang) * L}
+                x2={cx + Math.cos(ang) * L}
+                y2={cz + Math.sin(ang) * L}
+                className="laser-axis"
+              />
+            )
+          })}
+          <path
+            d={`M${result.center[0] - 2.2 * handleR} ${result.center[1]}h${4.4 * handleR}M${result.center[0]} ${result.center[1] - 2.2 * handleR}v${4.4 * handleR}`}
+            className="laser-center-cross"
+          />
+          <circle
+            cx={result.center[0]}
+            cy={result.center[1]}
+            r={1.4 * handleR}
+            className="laser-center-handle"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              if (e.button !== 0) return
+              drag.current = { kind: 'center' }
+              svgRef.current?.setPointerCapture(e.pointerId)
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              setLaserParam('centerXMm', 0)
+              setLaserParam('centerZMm', 0)
+            }}
+          />
+        </g>
       )}
 
       {attractors?.map((a) => {

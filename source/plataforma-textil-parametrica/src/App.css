@@ -459,6 +459,91 @@ button.ghost {
   margin: 0 -1px -1px 0;
 }
 
+.seg.seg-grid.seg-grid-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* patrones de bisagra kerf: miniatura + nombre */
+.hinge-patterns button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+}
+
+.hinge-icon {
+  width: 34px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---------- editor de modulo ---------- */
+.module-editor svg {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin-bottom: 10px;
+  background: #0d0d0c;
+  border: 1px solid var(--line-soft);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.module-editor .row {
+  margin-bottom: 8px;
+}
+
+.module-cell {
+  fill: none;
+  stroke: var(--gray-2);
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.module-snap line {
+  stroke: var(--line-faint);
+  vector-effect: non-scaling-stroke;
+}
+
+.module-ghost {
+  fill: none;
+  stroke: var(--gray-2);
+  stroke-width: 1;
+  opacity: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.module-path {
+  fill: none;
+  stroke: var(--gray-1);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.module-path.active {
+  stroke: var(--white);
+  stroke-width: 2;
+}
+
+.module-handle {
+  fill: var(--black);
+  stroke: var(--gray-1);
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+
+.module-handle.active {
+  stroke: var(--white);
+}
+
 /* ---------- vista 2D: corte laser ---------- */
 .laser-view {
   display: block;
@@ -539,6 +624,54 @@ button.ghost {
 .laser-attr.selected .laser-attr-reach,
 .laser-attr.selected .laser-attr-line {
   stroke: var(--white);
+}
+
+/* familia capas: numero de cada capa / pieza */
+.laser-label {
+  fill: var(--gray-1);
+  font-family: 'JetBrains Mono', monospace;
+  pointer-events: none;
+}
+
+.laser-bed-frame {
+  fill: #0d0d0c;
+  stroke: var(--gray-2);
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+
+/* copias del campo por simetria: solo referencia, no se editan */
+.laser-attr-ghost {
+  fill: none;
+  stroke: var(--gray-2);
+  stroke-width: 1;
+  stroke-dasharray: 1 5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.laser-axis {
+  stroke: var(--gray-2);
+  stroke-width: 1;
+  stroke-dasharray: 8 4 2 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.laser-center-cross {
+  stroke: var(--white);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.laser-center-handle {
+  fill: transparent;
+  stroke: var(--white);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
 }
 
 /* ---------- responsive ---------- */

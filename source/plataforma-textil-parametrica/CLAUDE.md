@@ -167,6 +167,61 @@ src/
 - Pendiente: Clipper2 para kerf robusto, reticula reentrante / quiral (guia
   Fase 3), nesting, estimacion de tiempo de corte por material.
 
+#### Corte laser: bisagra kerf, modulo, radial y simetrias
+- `geometry/laserPattern.ts` (puro): disposicion `grid` (rotacion, centro,
+  desfase) / `radial` (anillos a paso fijo, `floor` de elementos por anillo
+  para que el arco nunca sea menor al paso, sectores, `radialWarp` curva cada
+  elemento en coordenadas polares); `symmetrizeAttractors` (espejos, rotacion
+  N, caleidoscopio 2N) — la simetria se aplica COPIANDO ATRACTORES (ids
+  `orig~k`, la vista los dibuja punteados), no los cortes, asi el puente
+  sigue garantizado; `flipShapes` (alternancia de celda); generadores de
+  bisagra kerf (`hingeRowElement`, `meanderElement`, `trianglesElement`);
+  `createBridgeGuard`: indice espacial de segmentos que rechaza un elemento a
+  menos de `requiredGap` (puente + kerf/2 por cada lado abierto) de lo ya
+  aceptado. En grilla no deberia rechazar nada (los tamanos ya se derivan del
+  paso); en radial / modulos libres es lo que sostiene la garantia.
+- `laserCut.ts`: familias `hinge` y `module`; calado/escamas/bisagra/modulo
+  pasan por `forEachElement` + `emitElement` (margen, guardia, kerf). Un
+  extremo abierto que cae sobre otro trazo del mismo elemento es una union y
+  NO se acorta. Bisagra en filas: paso fijo = largo + puente lejos, el campo
+  cambia el puente (y el largo); el ancho de figura se limita una vez por paso
+  con `rowWidthLimit` contra el peor caso (corte mas largo). `distribution`
+  (`field`/`full`/`uniform`; entrar a bisagra/modulo pasa `field` -> `full`),
+  `kerfCompensation` (apagado: archivo sin offset, puente igual con kerf real).
+- `laserSwatch.ts`: muestrario de tarjetas 60x90 (separaciones 1.5-4 mm o
+  todos los patrones), exportado como SVG con capa `grabado` de texto.
+- UI: `ModuleEditor` (celda con vecinas fantasma, snap, importar SVG via
+  `parseSvgToModule` — mismas APIs nativas que importSvg, verificar en
+  navegador real si se toca), centro arrastrable en `LaserView`.
+- Tests: `laserPattern.test.ts` (puente real por patron, radial = arcos,
+  simetria, modulo, muestrario).
+
+#### Corte laser: capas concentricas + cama
+- `geometry/laserLayers.ts` (puro): familia `layers` — cada capa es una PIEZA
+  suelta, anidada dentro de la anterior (curvas de nivel, ref. Iris van
+  Herpen). Union `center`: rayos desde el centro (forma estrellada; si el
+  centro cae fuera del contorno se usa el centro de la caja), agujero central
+  comun. Union `edge`: rayos perpendiculares a una arista de la caja (`top`/
+  `bottom`/`left`/`right`); todas las capas comparten el tramo de contorno de
+  esa arista (como hojas), `edgeTaper` acorta la arista por capa, fila de
+  agujeros comunes a `holeInsetMm`. Forma: fraccion de 1 a `innerScale` *
+  lobulos senoidales con giro por capa * empuje del campo. Garantias: banda
+  >= `minStepMm` con la capa anterior (salvo en el piso) y piso que deja los
+  agujeros con puente. Una capa que ya no aporta curva corta la serie
+  (`skippedBySize`).
+- `LaserCutResult.pieces` (piezas con kerf ya compensado) y `labels` (numero
+  de capa en la vista de diseno). En el diseno la capa 1 es el contorno y las
+  demas se dibujan como `corte` cerrado.
+- `geometry/laserBed.ts`: `layoutOnBed` — estantes, pieza apaisada si entra,
+  ordenadas por alto, camas nuevas debajo (30 mm) si no entran; numero
+  grabado a la izquierda, FUERA de la pieza (columna reservada). `oversize`
+  cuenta piezas que no entran en ninguna orientacion.
+- Export: `laserToSvg/laserToDxf` aceptan `labels` (TEXT en capa GRABADO,
+  con `anchor`) y `frames` (marco de cama en capa
+  `CAMA_REFERENCIA_NO_CORTAR`). Para `layers` el panel exporta la cama, no
+  el diseno. `laserPreviewBed` (store) muestra la cama en la vista.
+- Tests: `laserLayers.test.ts`.
+
 ### Setup — COMPLETO
 - Vite React-TS, estructura de carpetas, tsconfig estricto, prettier, vitest.
 - `utils/units.ts` (Three<->mm, 1u=1cm), `utils/params.ts`, `utils/random.ts`.
