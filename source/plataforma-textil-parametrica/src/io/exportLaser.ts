@@ -13,11 +13,9 @@ import type { CutLayer, CutPath, LaserCutResult, TextLabel } from '../geometry/l
 import { LAYER_ORDER } from '../geometry/laserCut'
 import type { SwatchSheet } from '../geometry/laserSwatch'
 import type { BedLayout } from '../geometry/laserBed'
-import type { Specimen } from '../geometry/laserSpecimens'
 import type { Vec2 } from '../geometry/polygon'
 import { textToStrokes } from '../geometry/strokeFont'
 import { triggerDownload } from './download'
-import { buildZip } from './zip'
 
 export const LAYER_COLORS: Record<CutLayer, { hex: string; aci: number; name: string }> =
   {
@@ -294,9 +292,16 @@ function psString(s: string): string {
   return s.replace(/[()\\]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, '?')
 }
 
-export function downloadLaserAi(result: LaserCutResult, filename = 'corte-laser'): void {
+/** `padMm` = 0: el archivo mide exactamente la pieza (probeta de 200 x 200). */
+export function downloadLaserAi(
+  result: LaserCutResult,
+  filename = 'corte-laser',
+  padMm = SVG_PAD_MM,
+): void {
   triggerDownload(
-    new Blob([laserToAi(result, filename)], { type: 'application/postscript' }),
+    new Blob([laserToAi(result, filename, [], padMm)], {
+      type: 'application/postscript',
+    }),
     `${filename}.ai`,
   )
 }
@@ -308,57 +313,13 @@ export function downloadBedAi(bed: BedLayout, filename = 'cama-laser'): void {
   )
 }
 
-export type SpecimenFormat = 'svg' | 'dxf' | 'ai'
-
-const SPECIMEN_MIME: Record<SpecimenFormat, string> = {
-  svg: 'image/svg+xml',
-  dxf: 'application/dxf',
-  ai: 'application/postscript',
-}
-
-/**
- * Archivo de una probeta: mide exactamente su formato (sin aire), asi el
- * origen del archivo es la esquina de la pieza en la mesa.
- */
-export function specimenToFile(specimen: Specimen, format: SpecimenFormat): string {
-  const title = specimen.name
-  return format === 'svg'
-    ? laserToSvg(specimen, title, specimen.labels, specimen.frames, 0)
-    : format === 'dxf'
-      ? laserToDxf(specimen, specimen.labels, specimen.frames)
-      : laserToAi(specimen, title, specimen.labels, 0)
-}
-
-export function downloadSpecimen(specimen: Specimen, format: SpecimenFormat): void {
-  triggerDownload(
-    new Blob([specimenToFile(specimen, format)], { type: SPECIMEN_MIME[format] }),
-    `${specimen.name}.${format}`,
-  )
-}
-
-/** Todas las probetas en un .zip, un archivo por probeta (y por formato). */
-export function downloadSpecimensZip(
-  specimens: readonly Specimen[],
-  formats: readonly SpecimenFormat[],
-  filename = 'probetas-laser',
+export function downloadLaserSvg(
+  result: LaserCutResult,
+  filename = 'corte-laser',
+  padMm = SVG_PAD_MM,
 ): void {
-  const zip = buildZip(
-    specimens.flatMap((s) =>
-      formats.map((format) => ({
-        name: `${s.name}.${format}`,
-        content: specimenToFile(s, format),
-      })),
-    ),
-  )
   triggerDownload(
-    new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }),
-    `${filename}.zip`,
-  )
-}
-
-export function downloadLaserSvg(result: LaserCutResult, filename = 'corte-laser'): void {
-  triggerDownload(
-    new Blob([laserToSvg(result, filename)], { type: 'image/svg+xml' }),
+    new Blob([laserToSvg(result, filename, [], [], padMm)], { type: 'image/svg+xml' }),
     `${filename}.svg`,
   )
 }

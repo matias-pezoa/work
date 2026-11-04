@@ -164,7 +164,7 @@ export const ELEMENT_FAMILIES: ReadonlySet<LaserFamily> = new Set([
 export type LaserDistribution = 'field' | 'full' | 'uniform'
 
 export const DISTRIBUTION_LABELS: Record<LaserDistribution, string> = {
-  field: 'Solo con campo',
+  field: 'Cerca de atractores',
   full: 'Toda la pieza',
   uniform: 'Uniforme',
 }

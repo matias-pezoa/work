@@ -222,7 +222,7 @@ src/
   el diseno. `laserPreviewBed` (store) muestra la cama en la vista.
 - Tests: `laserLayers.test.ts`.
 
-#### Corte laser: imagen -> calados, generador de probetas, export AI3
+#### Corte laser: imagen -> calados, probeta 20x20, export AI3, panel simple
 - `geometry/laserImage.ts` (puro): `LaserBitmap` (luminancia 0..1 por fila),
   `imageRect` (la imagen CUBRE la caja de la pieza, + zoom/desplazamiento),
   `toneToDarkness` (brillo, contraste, gamma, invertir), `createImageSampler`
@@ -240,31 +240,32 @@ src/
   testeable en vitest; verificado con playwright-core + Chrome desde el
   scratchpad, sin instalarlo en el proyecto). Reduce a `MAX_IMAGE_PX` = 400.
   Estado: `laserImage` (lum + `previewUrl` para dibujarla bajo los calados).
-- `geometry/laserSpecimens.ts`: una probeta = un archivo de formato fijo
-  (200x200 por defecto; la pieza mide el formato, contorno opcional con kerf
-  hacia afuera). Pedido del usuario: probetas independientes, no varias en una
-  cama, para no confundirlas. `planSpecimens` (barato: valores por probeta)
-  + `buildSpecimen` (geometria con `buildLaserCut` sobre el area bajo la
-  franja del rotulo). Dos ejes = todas las combinaciones (`steps` x
-  `stepsY`); uno = valor que avanza; ninguno = copias. Nombre de archivo con
-  `apellido_probeta_NN` (`specimenFileName`; `surname` obligatorio para
-  exportar, tambien grabado en la probeta; zip = `apellido_probetas`). `keepField` escala atractores (si
-  no: distribucion uniforme). `layers`/`footprint` no admiten probetas.
-  App solo construye la probeta a la vista (`specimenIndex`); el resto al
-  exportar (`buildAll`). Estado: `specimen`, `specimenIndex`, `laserTab`.
+- Probeta (`geometry/laserSpecimens.ts`): NO es un generador aparte. Es el
+  flujo completo de Diseno con la Pieza fija en 200x200 (`specimenParams`;
+  la forma importada no aplica). Se descarto una version anterior con
+  pestana propia, matriz de variaciones y .zip: el usuario la rechazo, quiere
+  todas las herramientas de Diseno. Estado: `laserPiece`
+  ('specimen' por defecto | 'custom'), `specimenSurname`, `specimenNumber`.
+  Archivo `Apellido_probeta_NN` (`specimenFileName`); sin apellido no se
+  exporta en modo probeta. Export sin aire (padMm 0): el archivo mide
+  200 + kerf (el contorno va kerf/2 afuera para que la pieza mida 200).
+- Panel laser pensado para alumnos sin formacion tecnica: pasos numerados
+  (1 Pieza, 2 Patron, 3 Donde cambia el patron, 4 Exportar), textos cortos, y
+  lo tecnico plegado en `<details className="more">` (simetria/disposicion,
+  detalle tecnico, muestrario de bisagras). Sin selector de
+  material ni ajustes de kerf/puente en la UI (pedido del usuario): se usan
+  los valores por defecto de DEFAULT_LASER, compensados igual. Atractores de ejemplo dentro de la probeta.
 - `geometry/strokeFont.ts`: tipografia de trazo (glifos 4x6) para grabar
   rotulos como vectores en el .ai.
 - `io/exportLaser.ts`: `laserToAi` = Adobe Illustrator 3 (EPSF-1.2,
   `%%Creator: Adobe Illustrator(TM) 3.2`, puntos, Y arriba, grupos `u/U` por
   color CMYK `K`: grabado negro, calado azul, corte verde, contorno rojo; sin
   marco de cama: AI3 no tiene capas). `laserToSvg(..., padMm)`: con 0 el
-  archivo mide exactamente `bounds`. `downloadSpecimen` (una) y
-  `downloadSpecimensZip` (todas, un archivo por probeta y formato; `io/zip.ts` =
-  ZIP sin compresion, sin dependencias).
+  archivo mide exactamente `bounds` (`downloadLaserSvg/Ai(..., padMm)`).
   El .ai no se verifico abriendolo en Illustrator/LightBurn: hacerlo con el
   primer archivo real.
-- Tests: `laserImage.test.ts`, `laserSpecimens.test.ts` (incluye export AI/SVG/DXF
-  y tipografia).
+- Tests: `laserImage.test.ts`, `laserSpecimens.test.ts` (probeta, nombre, AI,
+  tipografia).
 
 ### Setup — COMPLETO
 - Vite React-TS, estructura de carpetas, tsconfig estricto, prettier, vitest.

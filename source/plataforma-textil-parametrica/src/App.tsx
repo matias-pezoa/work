@@ -20,8 +20,7 @@ import type { SpikePlacement } from './geometry/spikeField'
 import { buildWaveField } from './geometry/waveField'
 import { buildLaserCut, type LaserCutResult } from './geometry/laserCut'
 import { layoutOnBed, type BedLayout } from './geometry/laserBed'
-import { buildSpecimen, planSpecimens } from './geometry/laserSpecimens'
-import type { SpecimenView } from './components/SpecimenPanel'
+import { specimenParams } from './geometry/laserSpecimens'
 import { imageRect } from './geometry/laserImage'
 import { polygonBounds } from './geometry/polygon'
 import { threeToMm } from './utils/units'
@@ -45,8 +44,6 @@ export default function App() {
   const laserFamily = useAppStore((s) => s.laser.family)
   const laserSet = useAttractorSet('laser')
   const bed = useLaserBed(laser)
-  const laserTab = useAppStore((s) => s.laserTab)
-  const specimens = useSpecimens(mode === 'laser' && laserTab === 'specimens', laser)
   const previewBed = useAppStore((s) => s.laserPreviewBed) && bed !== null
   const underlay = useImageUnderlay(laser)
   useDeleteShortcut(mode === 'laser' && laserFamily === 'footprint' ? null : mode)
@@ -68,20 +65,7 @@ export default function App() {
       </header>
 
       <main className="viewport">
-        {mode === 'laser' && laser && specimens?.current ? (
-          <LaserView
-            key="specimens"
-            result={{
-              ...laser,
-              paths: specimens.current.paths,
-              bounds: specimens.current.bounds,
-              sheet: { outer: [], holes: [] },
-              labels: specimens.current.labels,
-            }}
-            frames={specimens.current.frames}
-            set={null}
-          />
-        ) : mode === 'laser' && laser && previewBed && bed ? (
+        {mode === 'laser' && laser && previewBed && bed ? (
           // key propia: el zoom/encuadre de la cama no se arrastra a la vista de diseno.
           <LaserView
             key="bed"
@@ -167,12 +151,7 @@ export default function App() {
         {mode === 'volume' && <SpikeFieldPanel result={spikes} />}
         {mode === 'wave' && <WaveFieldPanel result={waves} />}
         {mode === 'laser' && laser && (
-          <LaserPanel
-            result={laser}
-            bed={bed}
-            spikeCount={spikes.placements.length}
-            specimens={specimens}
-          />
+          <LaserPanel result={laser} bed={bed} spikeCount={spikes.placements.length} />
         )}
       </aside>
     </div>
@@ -230,6 +209,7 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
   const baseShape = useAppStore((s) => s.baseShape)
   const spikePlaneSize = useAppStore((s) => s.field.planeSize)
   const image = useAppStore((s) => s.laserImage)
+  const specimen = useAppStore((s) => s.laserPiece === 'specimen')
 
   return useMemo(() => {
     if (!active) return null
@@ -241,66 +221,14 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
             rootRadiusMm: p.rootRadiusMm,
           }))
         : []
-    return buildLaserCut(attractors, laser, {
-      boundary: baseShape,
+    // probeta: pieza fija de 200 x 200 (la forma importada no aplica).
+    return buildLaserCut(attractors, specimen ? specimenParams(laser) : laser, {
+      boundary: specimen ? null : baseShape,
       footprints,
       footprintPlaneMm: threeToMm(spikePlaneSize),
       image,
     })
-  }, [active, laser, attractors, baseShape, placements, spikePlaneSize, image])
-}
-
-/**
- * Generador de probetas: solo se calcula con su pestana activa, y solo la
- * probeta a la vista (el resto se arma al exportar).
- */
-function useSpecimens(
-  active: boolean,
-  design: LaserCutResult | null,
-): SpecimenView | null {
-  const laser = useAppStore((s) => s.laser)
-  const specimen = useAppStore((s) => s.specimen)
-  const index = useAppStore((s) => s.specimenIndex)
-  const attractors = useAppStore((s) => s.laserAttractors)
-  const image = useAppStore((s) => s.laserImage)
-  const designBounds = design ? polygonBounds(design.sheet.outer) : undefined
-  const key = designBounds
-    ? [designBounds.minX, designBounds.maxX, designBounds.minZ, designBounds.maxZ].join()
-    : ''
-  const series = useMemo(
-    () => (active ? planSpecimens(laser, specimen) : null),
-    [active, laser, specimen],
-  )
-  const total = series?.plans.length ?? 0
-  const at = Math.min(index, Math.max(0, total - 1))
-  // designBounds se compara por valor (key): el objeto cambia en cada calculo del diseno.
-  const input = useMemo(
-    () => ({ image, designBounds }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [image, key],
-  )
-  const current = useMemo(
-    () =>
-      series && total > 0
-        ? buildSpecimen(series.plans[at], total, attractors, laser, specimen, input)
-        : null,
-    [series, total, at, attractors, laser, specimen, input],
-  )
-  return useMemo(
-    () =>
-      series && {
-        series,
-        index: at,
-        current,
-        buildAll: () =>
-          series.plans.map((p) =>
-            p.number === current?.number
-              ? current
-              : buildSpecimen(p, total, attractors, laser, specimen, input),
-          ),
-      },
-    [series, at, current, total, attractors, laser, specimen, input],
-  )
+  }, [active, laser, attractors, baseShape, placements, spikePlaneSize, image, specimen])
 }
 
 /** Imagen bajo los calados (familia imagen o imagen como campo), en mm de la pieza. */

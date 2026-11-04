@@ -1,7 +1,6 @@
 /** Panel del modo Corte laser: cortes y calados parametricos sobre una pieza plana. */
 import { useId, useState, type ReactNode } from 'react'
 import { useAppStore } from '../state/store'
-import { SpecimenPanel, type SpecimenView } from './SpecimenPanel'
 import { importImageFile } from '../io/importImage'
 import { IMAGE_MODE_LABELS, type ImageMode } from '../geometry/laserImage'
 import { ParamSlider } from './ParamSlider'
@@ -18,9 +17,7 @@ import {
   FIELD_LASER_UI_PARAMS,
   hingeAsModule,
   hingeUiParams,
-  LASER_MATERIALS,
   LAYOUT_UI_PARAMS,
-  MATERIAL_UI_PARAMS,
   MIN_FEATURE_MM,
   RADIAL_UI_PARAMS,
   SHEET_UI_PARAMS,
@@ -75,6 +72,11 @@ import {
   type LayerJoin,
 } from '../geometry/laserLayers'
 import { mmToThree } from '../utils/units'
+import {
+  SPECIMEN_SIZE_MM,
+  specimenFileName,
+  surnameSlug,
+} from '../geometry/laserSpecimens'
 
 interface LaserPanelProps {
   result: LaserCutResult
@@ -82,45 +84,32 @@ interface LaserPanelProps {
   bed: BedLayout | null
   /** Puas del modo Volumen disponibles para la familia "huella". */
   spikeCount: number
-  /** Cama de probetas (solo con la pestana Probetas activa). */
-  specimens: SpecimenView | null
 }
 
+/** Que hace cada patron, en lenguaje simple. */
 const FAMILY_HINTS: Record<LaserFamily, string> = {
   perforation:
-    'Perforaciones en grilla hexagonal. Cerca de un atractor crecen hasta el maximo que ' +
-    'permite el puente; con "Alargamiento" > 1 se vuelven ranuras orientadas segun el campo.',
+    'Agujeros repetidos por la pieza. Cerca de los atractores crecen; con "Alargamiento" se vuelven ranuras.',
   kirigami:
-    'Reticula auxetica de cuadrados rotantes: cortes rectos alternados. Al traccionar, los ' +
-    'cuadrados giran y la pieza se ensancha en ambos sentidos. Cerca de un atractor la ' +
-    'bisagra se achica: mas estiramiento y caida.',
-  scales:
-    'Cortes en arco en filas alternadas: la lengueta dentro de cada arco se levanta al ' +
-    'curvar la pieza. Con "Seguir el campo" las puntas apuntan lejos del atractor.',
+    'Cortes rectos alternados: al tirar la pieza se estira hacia los dos lados (auxetico).',
+  scales: 'Cortes en arco: las lenguetas se levantan como escamas al curvar la pieza.',
   hinge:
-    'Bisagra kerf (kerf bending): filas de cortes desfasados que vuelven flexible una ' +
-    'plancha rigida. Menos separacion entre filas y menos puente = mas flexible (y mas ' +
-    'fragil). El campo pasa del puente "lejos" al "cerca": la pieza se dobla mas donde ' +
-    'hay atractores. En radial, las filas se vuelven anillos concentricos.',
+    'Filas de cortes que vuelven flexible un material rigido. Filas mas juntas = mas flexible (y mas fragil).',
   module:
-    'Dibuja tu propio modulo en la celda y se repite por toda la pieza (grilla o radial). ' +
-    'Trazo abierto = corte, cerrado = calado. El modulo se escala para dejar siempre el ' +
-    'puente con las celdas vecinas; el campo lo agranda cerca de los atractores.',
+    'Dibuja tu propio modulo en la celda y se repite por toda la pieza. Linea abierta = corte; cerrada = calado.',
   layers:
-    'Capas concentricas, como curvas de nivel: cada capa es una pieza suelta, mas chica ' +
-    'que la anterior. Apiladas y unidas desde el centro (agujero comun) o desde una ' +
-    'arista (fila de agujeros), sus bordes forman el relieve. Los lobulos ondulan las ' +
-    'capas y el giro los desplaza de una a otra; los atractores las empujan. Al exportar, ' +
-    'las piezas salen distribuidas en la cama del laser, numeradas al costado.',
-  image:
-    'Carga una imagen: se pasa a escala de grises y a un mapa de bits sobre una grilla, ' +
-    'y cada pixel oscuro se vuelve un calado. Semitono: el tamano sigue el tono. Umbral: ' +
-    'pixel lleno o nada. Tramado: 1 bit con difusion de error, los grises quedan como ' +
-    'densidad de calados. El puente entre pixeles se respeta igual que en el calado.',
+    'Capas concentricas, como curvas de nivel: cada capa es una pieza suelta para apilar. Se exportan repartidas en la cama del laser.',
+  image: 'Carga una imagen: las zonas oscuras se vuelven calados.',
   footprint:
-    'Un calado circular en la base de cada pua del modo Volumen (mismas posiciones y base). ' +
-    'Impreso encima, el filamento atraviesa el calado y se ancla a la tela. Se ajusta ' +
-    'desde los atractores y parametros del modo Volumen.',
+    'Un calado en la base de cada pua del modo Volumen, para anclar la impresion 3D a la tela.',
+}
+
+/** Que significa cada opcion de "Donde cambia el patron". */
+const DISTRIBUTION_HINTS: Record<LaserDistribution, string> = {
+  uniform: 'El patron es igual en toda la pieza.',
+  full: 'El patron cubre toda la pieza y cambia de tamano cerca de los atractores (puntos y curvas que dibujas en la vista).',
+  field:
+    'El patron aparece solo cerca de los atractores (puntos y curvas que dibujas en la vista).',
 }
 
 const SYMMETRY_HINT: Record<LaserSymmetry, string> = {
@@ -132,58 +121,37 @@ const SYMMETRY_HINT: Record<LaserSymmetry, string> = {
   kaleido: 'N copias giradas y sus reflejos (2N): un caleidoscopio.',
 }
 
-export function LaserPanel({ result, bed, spikeCount, specimens }: LaserPanelProps) {
-  const tab = useAppStore((s) => s.laserTab)
-  const setTab = useAppStore((s) => s.setLaserTab)
-  const tabs = (
-    <div className="seg laser-tabs">
-      <button
-        type="button"
-        className={tab === 'design' ? 'active' : ''}
-        onClick={() => setTab('design')}
-      >
-        Diseno
-      </button>
-      <button
-        type="button"
-        className={tab === 'specimens' ? 'active' : ''}
-        onClick={() => setTab('specimens')}
-      >
-        Generador de probetas
-      </button>
-    </div>
-  )
-  if (tab === 'specimens') {
-    return (
-      <div className="panel">
-        {tabs}
-        <SpecimenPanel view={specimens} />
-      </div>
-    )
-  }
-  return <DesignPanel result={result} bed={bed} spikeCount={spikeCount} tabs={tabs} />
-}
+const SPECIMEN_NUMBER_PARAM = {
+  key: 'specimenNumber',
+  label: 'Numero de probeta',
+  min: 1,
+  max: 50,
+  step: 1,
+  default: 1,
+  unit: '-',
+} as const
 
-function DesignPanel({
-  result,
-  bed,
-  spikeCount,
-  tabs,
-}: Omit<LaserPanelProps, 'specimens'> & { tabs: ReactNode }) {
+export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
   const laser = useAppStore((s) => s.laser)
   const setParam = useAppStore((s) => s.setLaserParam)
   const setOption = useAppStore((s) => s.setLaserOption)
   const setFamily = useAppStore((s) => s.setLaserFamily)
-  const setMaterial = useAppStore((s) => s.setLaserMaterial)
   const setCombine = useAppStore((s) => s.setLaserCombine)
   const toggleAlign = useAppStore((s) => s.toggleLaserAlign)
   const previewBed = useAppStore((s) => s.laserPreviewBed)
   const setPreviewBed = useAppStore((s) => s.setLaserPreviewBed)
+  const piece = useAppStore((s) => s.laserPiece)
+  const setPiece = useAppStore((s) => s.setLaserPiece)
+  const surname = useAppStore((s) => s.specimenSurname)
+  const setSurname = useAppStore((s) => s.setSpecimenSurname)
+  const specimenNumber = useAppStore((s) => s.specimenNumber)
+  const setSpecimenNumber = useAppStore((s) => s.setSpecimenNumber)
 
   const attractorSet = useAttractorSet('laser')
   const baseShape = useAppStore((s) => s.baseShape)
 
   const family = laser.family
+  const specimen = piece === 'specimen'
   const laserImage = useAppStore((s) => s.laserImage)
   const imageField = laser.imgAsField && laserImage !== null && family !== 'image'
   const usesField = family !== 'footprint' && family !== 'image'
@@ -194,7 +162,9 @@ function DesignPanel({
     (usesElements && laser.layout === 'radial') ||
     (family === 'layers' && laser.layerJoin === 'center') ||
     laser.symmetry !== 'none'
-  const editorPlaneSize = mmToThree(baseShape?.widthMm ?? laser.sheetWidthMm)
+  const editorPlaneSize = mmToThree(
+    specimen ? SPECIMEN_SIZE_MM : (baseShape?.widthMm ?? laser.sheetWidthMm),
+  )
 
   const slider = (p: LaserParam) => (
     <ParamSlider
@@ -205,10 +175,19 @@ function DesignPanel({
     />
   )
 
-  const filename =
-    family === 'hinge'
-      ? `corte-laser-bisagra-${laser.hingePattern}`
-      : `corte-laser-${family}`
+  const who = surnameSlug(surname)
+  const filename = specimen
+    ? specimenFileName(surname, specimenNumber)
+    : who
+      ? `${who}_pieza`
+      : family === 'hinge'
+        ? `corte-laser-bisagra-${laser.hingePattern}`
+        : `corte-laser-${family}`
+  // la probeta se nombra con el apellido: sin el no se exporta.
+  const canExport = !specimen || who !== ''
+  const empty = result.calados + result.cortes === 0
+  // la probeta se exporta sin aire: el archivo mide 200 x 200 mm.
+  const pad = specimen ? 0 : undefined
 
   const downloadSwatch = (variant: SwatchVariant) =>
     downloadSwatchSvg(
@@ -220,21 +199,35 @@ function DesignPanel({
 
   return (
     <div className="panel">
-      {tabs}
       <section>
-        <h3>Fabricable por construccion</h3>
+        <h3>1 · Pieza</h3>
+        <div className="seg">
+          <button
+            type="button"
+            className={specimen ? 'active' : ''}
+            onClick={() => setPiece('specimen')}
+          >
+            Probeta 20 x 20 cm
+          </button>
+          <button
+            type="button"
+            className={!specimen ? 'active' : ''}
+            onClick={() => setPiece('custom')}
+          >
+            Otra medida o forma
+          </button>
+        </div>
         <p className="hint">
-          Entre dos cortes vecinos siempre queda al menos el puente minimo de material
-          real ({result.bridgeMm.toFixed(1)} mm, ya descontado el kerf): los tamanos se
-          recortan a lo que permite la grilla y lo que aun asi no entra se descarta.
-          Ningun corte se acerca al borde a menos del margen, y no se generan rasgos
-          menores a {MIN_FEATURE_MM} mm. Los calados se compensan kerf/2 hacia adentro y
-          el contorno hacia afuera, para que la pieza fisica mida lo disenado.
+          {specimen
+            ? 'Un cuadrado de 20 x 20 cm listo para cortar. Disena el patron como en cualquier pieza.'
+            : 'Elige el tamano de la pieza o importa su contorno desde un SVG.'}
         </p>
+        {!specimen && !baseShape && family !== 'footprint' && SHEET_UI_PARAMS.map(slider)}
+        {!specimen && <BaseShapeImporter />}
       </section>
 
       <section>
-        <h3>Familia</h3>
+        <h3>2 · Patron</h3>
         <div className="seg seg-grid seg-grid-3">
           {(Object.keys(FAMILY_LABELS) as LaserFamily[]).map((f) => (
             <button
@@ -303,8 +296,8 @@ function DesignPanel({
             )}
             <p className="hint">
               {laser.layerJoin === 'center'
-                ? 'Todas las capas rodean el centro (la cruz en la vista, arrastrable) y comparten el agujero central.'
-                : 'Todas las capas nacen de la arista elegida, como hojas de un cuaderno, y comparten la fila de agujeros junto a ella.'}
+                ? 'Las capas rodean el centro (la cruz en la vista) y comparten un agujero central.'
+                : 'Las capas nacen de la arista elegida, como hojas de un cuaderno.'}
             </p>
             {layersUiParams(laser.layerJoin).map(slider)}
           </>
@@ -348,7 +341,7 @@ function DesignPanel({
 
       {usesField && (
         <section>
-          <h3>Campo</h3>
+          <h3>3 · Donde cambia el patron</h3>
           <div className="seg">
             {(Object.keys(DISTRIBUTION_LABELS) as LaserDistribution[]).map((d) => (
               <button
@@ -361,6 +354,7 @@ function DesignPanel({
               </button>
             ))}
           </div>
+          <p className="hint">{DISTRIBUTION_HINTS[laser.distribution]}</p>
           {laser.distribution !== 'uniform' && FIELD_LASER_UI_PARAMS.map(slider)}
           <label className="check">
             <input
@@ -368,7 +362,7 @@ function DesignPanel({
               checked={laser.imgAsField}
               onChange={() => setOption('imgAsField', !laser.imgAsField)}
             />
-            Usar una imagen como campo (lo oscuro atrae)
+            Usar una imagen en vez de atractores (lo oscuro atrae)
           </label>
           {laser.imgAsField && <ImageImporter slider={slider} />}
           {usesAlign && (
@@ -378,33 +372,26 @@ function DesignPanel({
                 checked={laser.alignToField}
                 onChange={toggleAlign}
               />
-              Seguir el campo (orientacion)
+              Orientar el patron segun los atractores
             </label>
-          )}
-          {laser.distribution !== 'uniform' && (
-            <div className="seg" style={{ marginTop: 14 }}>
-              <button
-                type="button"
-                className={laser.combine === 'max' ? 'active' : ''}
-                onClick={() => setCombine('max')}
-              >
-                Campo: maximo
-              </button>
-              <button
-                type="button"
-                className={laser.combine === 'sum' ? 'active' : ''}
-                onClick={() => setCombine('sum')}
-              >
-                Campo: suma
-              </button>
-            </div>
           )}
         </section>
       )}
 
+      {usesField && !imageField && laser.distribution !== 'uniform' ? (
+        <AttractorEditor
+          set={attractorSet}
+          planeSize={editorPlaneSize}
+          hint={
+            'Arrastra un punto en la vista para moverlo. Clic derecho: agrega un punto. ' +
+            'Supr borra el punto seleccionado. Rueda = zoom, doble clic = encuadrar.'
+          }
+        />
+      ) : null}
+
       {usesField && (
-        <section>
-          <h3>Disposicion y simetria</h3>
+        <details className="more">
+          <summary>Mas opciones: simetria y disposicion</summary>
           {usesElements && (
             <>
               <div className="seg">
@@ -452,7 +439,7 @@ function DesignPanel({
               </div>
             </>
           )}
-          <p className="hint">Simetria del campo (copia los atractores)</p>
+          <p className="hint">Simetria (copia los atractores)</p>
           <div className="seg seg-grid seg-grid-3">
             {(Object.keys(SYMMETRY_LABELS) as LaserSymmetry[]).map((s) => (
               <button
@@ -474,90 +461,79 @@ function DesignPanel({
             <>
               {CENTER_UI_PARAMS.map(slider)}
               <p className="hint">
-                El centro tambien se arrastra en la vista (cruz); doble clic en la cruz lo
-                devuelve al centro de la pieza.
+                El centro tambien se arrastra en la vista (cruz); doble clic la devuelve
+                al centro de la pieza.
               </p>
             </>
           )}
-        </section>
+          {laser.distribution !== 'uniform' && (
+            <>
+              <p className="hint">Varios atractores juntos</p>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={laser.combine === 'max' ? 'active' : ''}
+                  onClick={() => setCombine('max')}
+                >
+                  El mas fuerte
+                </button>
+                <button
+                  type="button"
+                  className={laser.combine === 'sum' ? 'active' : ''}
+                  onClick={() => setCombine('sum')}
+                >
+                  Se suman
+                </button>
+              </div>
+            </>
+          )}
+        </details>
       )}
 
       <section>
-        <h3>Material y kerf</h3>
-        <div className="seg seg-grid">
-          {LASER_MATERIALS.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={laser.materialId === m.id ? 'active' : ''}
-              onClick={() => setMaterial(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <p className="hint">
-          Valores de referencia: corta una muestra en un retazo del material real y ajusta
-          el kerf y el puente antes de la pieza final.
-        </p>
-        {MATERIAL_UI_PARAMS.map(slider)}
-        <label className="check">
+        <h3>{usesField ? '4' : '3'} · Exportar</h3>
+        <label className="param">
+          <span className="param-label">Apellido</span>
           <input
-            type="checkbox"
-            checked={laser.kerfCompensation}
-            onChange={() => setOption('kerfCompensation', !laser.kerfCompensation)}
+            type="text"
+            className="text-input"
+            value={surname}
+            placeholder="Ej. Pezoa"
+            maxLength={40}
+            onChange={(e) => setSurname(e.target.value)}
           />
-          Compensar kerf en el archivo
         </label>
-        {!laser.kerfCompensation && (
+        {specimen && (
+          <ParamSlider
+            param={SPECIMEN_NUMBER_PARAM}
+            value={specimenNumber}
+            onChange={setSpecimenNumber}
+          />
+        )}
+        {canExport ? (
           <p className="hint">
-            Sin compensar: el archivo trae la geometria disenada (usalo si el software del
-            laser aplica el offset). El puente se sigue calculando con el kerf real.
+            Archivo: <code>{filename}</code>
+          </p>
+        ) : (
+          <p className="hint error">
+            Escribe tu apellido para exportar: el archivo se llama
+            apellido_probeta_numero.
           </p>
         )}
-      </section>
-
-      {!baseShape && family !== 'footprint' && (
-        <section>
-          <h3>Pieza</h3>
-          {SHEET_UI_PARAMS.map(slider)}
-        </section>
-      )}
-
-      <BaseShapeImporter />
-
-      {usesField && !imageField && laser.distribution !== 'uniform' ? (
-        <AttractorEditor
-          set={attractorSet}
-          planeSize={editorPlaneSize}
-          hint={
-            'Arrastra un punto en la vista para moverlo. Clic derecho: agrega un punto a ' +
-            'la curva seleccionada (o un atractor nuevo si no hay curva seleccionada). ' +
-            'Supr borra el punto seleccionado. Circulo = vertice suave (Bezier), cuadrado ' +
-            '= esquina. Arrastrar el fondo desplaza, rueda = zoom, doble clic = encuadrar. ' +
-            'Las copias por simetria se ven punteadas y no se editan.'
-          }
-        />
-      ) : null}
-
-      <section>
-        <h3>Exportar</h3>
         <dl className="stats">
           <div>
             <dt>Calados</dt>
             <dd>{result.calados}</dd>
           </div>
-          <div>
-            <dt>Cortes abiertos</dt>
-            <dd>{result.cortes}</dd>
-          </div>
+          {result.cortes > 0 && (
+            <div>
+              <dt>Cortes</dt>
+              <dd>{result.cortes}</dd>
+            </div>
+          )}
           <div>
             <dt>Largo de corte</dt>
             <dd>{(result.cutLengthMm / 1000).toFixed(2)} m</dd>
-          </div>
-          <div>
-            <dt>Area calada</dt>
-            <dd>{(result.openRatio * 100).toFixed(1)} %</dd>
           </div>
           <div>
             <dt>Pieza</dt>
@@ -566,38 +542,14 @@ function DesignPanel({
               {(result.bounds.maxZ - result.bounds.minZ).toFixed(0)} mm
             </dd>
           </div>
-          {result.rejectedByEdge > 0 && (
-            <div>
-              <dt>Descartados por margen</dt>
-              <dd>{result.rejectedByEdge}</dd>
-            </div>
-          )}
-          {result.rejectedByBridge > 0 && (
-            <div>
-              <dt>Descartados por puente</dt>
-              <dd>{result.rejectedByBridge}</dd>
-            </div>
-          )}
-          {result.limitedByBridge > 0 && (
-            <div>
-              <dt>Recortados al puente</dt>
-              <dd>{result.limitedByBridge}</dd>
-            </div>
-          )}
-          {result.skippedBySize > 0 && (
-            <div>
-              <dt>Bajo el rasgo minimo</dt>
-              <dd>{result.skippedBySize}</dd>
-            </div>
-          )}
         </dl>
-        <p className="hint">
-          Capas por color: calados azul, cortes verde, contorno rojo — el contorno va al
-          final para que la pieza no se suelte antes de tiempo.
-        </p>
+        {empty && family !== 'layers' && (
+          <p className="hint error">
+            Todavia no hay nada que cortar: revisa el patron o agrega atractores.
+          </p>
+        )}
         {family === 'layers' ? (
           <>
-            <h3>Cama de corte</h3>
             {BED_UI_PARAMS.map(slider)}
             <label className="check">
               <input
@@ -605,59 +557,37 @@ function DesignPanel({
                 checked={previewBed}
                 onChange={() => setPreviewBed(!previewBed)}
               />
-              Ver las piezas en la cama
+              Ver las piezas en la cama del laser
             </label>
-            {bed && (
-              <dl className="stats">
-                <div>
-                  <dt>Piezas</dt>
-                  <dd>{result.pieces.length}</dd>
-                </div>
-                <div>
-                  <dt>Camas</dt>
-                  <dd>{bed.beds}</dd>
-                </div>
-                <div>
-                  <dt>Largo de corte (cama)</dt>
-                  <dd>{(bed.cutLengthMm / 1000).toFixed(2)} m</dd>
-                </div>
-                {bed.oversize > 0 && (
-                  <div>
-                    <dt>No entran en la cama</dt>
-                    <dd>{bed.oversize}</dd>
-                  </div>
-                )}
-              </dl>
+            {bed && bed.oversize > 0 && (
+              <p className="hint error">
+                {bed.oversize} pieza(s) no entran en la cama: agrandala.
+              </p>
             )}
-            <p className="hint">
-              Cada capa sale como pieza suelta, con su numero grabado al costado (fuera de
-              la pieza). El marco de la cama va en su propia capa, solo de referencia: no
-              lo cortes.
-            </p>
             <div className="row">
               <button
                 type="button"
                 className="primary"
-                disabled={!bed}
-                onClick={() => bed && downloadBedSvg(bed, 'cama-capas')}
+                disabled={!bed || !canExport}
+                onClick={() => bed && downloadBedSvg(bed, filename)}
               >
-                SVG cama (mm)
+                SVG
               </button>
               <button
                 type="button"
                 className="primary"
-                disabled={!bed}
-                onClick={() => bed && downloadBedDxf(bed, 'cama-capas')}
+                disabled={!bed || !canExport}
+                onClick={() => bed && downloadBedDxf(bed, filename)}
               >
-                DXF cama (mm)
+                DXF
               </button>
               <button
                 type="button"
                 className="primary"
-                disabled={!bed}
-                onClick={() => bed && downloadBedAi(bed, 'cama-capas')}
+                disabled={!bed || !canExport}
+                onClick={() => bed && downloadBedAi(bed, filename)}
               >
-                AI (Illustrator 3)
+                AI
               </button>
             </div>
           </>
@@ -666,37 +596,67 @@ function DesignPanel({
             <button
               type="button"
               className="primary"
-              onClick={() => downloadLaserSvg(result, filename)}
+              disabled={!canExport}
+              onClick={() => downloadLaserSvg(result, filename, pad)}
             >
-              SVG (mm)
+              SVG
             </button>
             <button
               type="button"
               className="primary"
+              disabled={!canExport}
               onClick={() => downloadLaserDxf(result, filename)}
             >
-              DXF (mm)
+              DXF
             </button>
             <button
               type="button"
               className="primary"
-              onClick={() => downloadLaserAi(result, filename)}
+              disabled={!canExport}
+              onClick={() => downloadLaserAi(result, filename, pad)}
             >
-              AI (Illustrator 3)
+              AI
             </button>
           </div>
         )}
+        <p className="hint">
+          AI = Illustrator 3, el formato que leen RDWorks y LightBurn. Colores: calados
+          azul, cortes verde, contorno rojo (se corta al final).
+        </p>
+        <details className="more nested">
+          <summary>Detalle tecnico</summary>
+          <dl className="stats">
+            <div>
+              <dt>Area calada</dt>
+              <dd>{(result.openRatio * 100).toFixed(1)} %</dd>
+            </div>
+            <div>
+              <dt>Descartados por margen</dt>
+              <dd>{result.rejectedByEdge}</dd>
+            </div>
+            <div>
+              <dt>Descartados por puente</dt>
+              <dd>{result.rejectedByBridge}</dd>
+            </div>
+            <div>
+              <dt>Recortados al puente</dt>
+              <dd>{result.limitedByBridge}</dd>
+            </div>
+            <div>
+              <dt>Menores a {MIN_FEATURE_MM} mm</dt>
+              <dd>{result.skippedBySize}</dd>
+            </div>
+          </dl>
+        </details>
       </section>
 
       {family === 'hinge' && (
-        <section>
-          <h3>Muestrario de prueba</h3>
+        <details className="more">
+          <summary>Muestrario de bisagras</summary>
           <p className="hint">
-            Tarjetas de 60 x 90 mm con agujero y rotulo grabado, para probar en el
-            material real antes de la pieza: el patron actual con separaciones de{' '}
-            {SWATCH_SPACINGS_MM[0]} a {SWATCH_SPACINGS_MM[SWATCH_SPACINGS_MM.length - 1]}{' '}
-            mm, o todos los patrones con la separacion actual. Si el software del laser no
-            lee texto, conviertelo a trazos.
+            Tarjetas de 60 x 90 mm para comparar en el material: el patron actual con
+            separaciones de {SWATCH_SPACINGS_MM[0]} a{' '}
+            {SWATCH_SPACINGS_MM[SWATCH_SPACINGS_MM.length - 1]} mm, o todos los patrones.
           </p>
           <div className="row">
             <button type="button" onClick={() => downloadSwatch('spacing')}>
@@ -706,7 +666,7 @@ function DesignPanel({
               Todos los patrones
             </button>
           </div>
-        </section>
+        </details>
       )}
     </div>
   )
@@ -792,8 +752,7 @@ function ImageImporter({ slider }: { slider: (p: LaserParam) => ReactNode }) {
             style={laser.imgInvert ? { filter: 'invert(1)' } : undefined}
           />
           <p className="hint">
-            {image.width} x {image.height} px (reducida para el calculo). La imagen cubre
-            la pieza; ajusta zoom y desplazamiento para encuadrarla.
+            La imagen cubre la pieza: usa zoom y desplazamiento para encuadrarla.
           </p>
           {IMAGE_TONE_UI_PARAMS.map(slider)}
           <label className="check">

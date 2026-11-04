@@ -796,3 +796,41 @@ button.ghost {
 .text-input::placeholder {
   color: var(--gray-1);
 }
+
+/* opciones avanzadas plegadas: lo esencial queda a la vista */
+.panel details.more {
+  border-top: 1px solid var(--line-faint);
+  padding: 14px 0;
+}
+
+.panel details.more.nested {
+  border-top: none;
+  padding: 8px 0 0;
+}
+
+.panel details.more > summary {
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gray-1);
+}
+
+.panel details.more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel details.more > summary::before {
+  content: '+ ';
+}
+
+.panel details.more[open] > summary::before {
+  content: '– ';
+}
+
+.panel details.more[open] > summary {
+  margin-bottom: 14px;
+  color: var(--white);
+}

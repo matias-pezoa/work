@@ -23,11 +23,6 @@ import { fitBoundaryToWidth, rescaleBoundary, type Vec2 } from '../geometry/poly
 import type { ImportedBoundary } from '../io/importSvg'
 import type { ImportedImage } from '../io/importImage'
 import {
-  DEFAULT_SPECIMEN,
-  type SpecimenNumericKey,
-  type SpecimenParams,
-} from '../geometry/laserSpecimens'
-import {
   applyAttractorPatch,
   createAttractor,
   createCurveAttractor,
@@ -38,8 +33,8 @@ import {
 
 export type AppMode = 'volume' | 'wave' | 'laser'
 export type GizmoMode = 'translate' | 'rotate'
-/** Corte laser: diseno de la pieza o generador de probetas. */
-export type LaserTab = 'design' | 'specimens'
+/** Corte laser: probeta fija de 200 x 200 mm, o pieza de medida/forma libre. */
+export type LaserPiece = 'specimen' | 'custom'
 
 /** Campos numericos de SpikeFieldParams editables desde la UI. */
 export type FieldNumericKey = Exclude<keyof SpikeFieldParams, 'combine' | 'alignToField'>
@@ -83,11 +78,10 @@ export interface AppState {
   laserPreviewBed: boolean
   /** Imagen para la familia imagen / campo de imagen (luminancia reducida). */
   laserImage: ImportedImage | null
-  laserTab: LaserTab
-  /** Generador de probetas: una probeta por archivo. */
-  specimen: SpecimenParams
-  /** Probeta mostrada en la vista (0..n-1). */
-  specimenIndex: number
+  laserPiece: LaserPiece
+  /** Apellido de quien corta: va en el nombre de archivo (`apellido_probeta_NN`). */
+  specimenSurname: string
+  specimenNumber: number
 
   /**
    * Punto de control seleccionado del atractor seleccionado del modo activo
@@ -130,10 +124,9 @@ export interface AppState {
   toggleLaserAlign: () => void
   setLaserPreviewBed: (on: boolean) => void
   setLaserImage: (image: ImportedImage | null) => void
-  setLaserTab: (tab: LaserTab) => void
-  setSpecimenParam: (key: SpecimenNumericKey, value: number) => void
-  setSpecimen: (patch: Partial<SpecimenParams>) => void
-  setSpecimenIndex: (index: number) => void
+  setLaserPiece: (piece: LaserPiece) => void
+  setSpecimenSurname: (surname: string) => void
+  setSpecimenNumber: (n: number) => void
   addLaserAttractor: (position: [number, number, number]) => void
   addLaserAttractorCurve: (points: readonly [number, number, number][]) => void
   updateLaserAttractor: (id: string, patch: AttractorPatch) => void
@@ -198,25 +191,26 @@ function initialWaveAttractors(): Attractor[] {
 }
 
 /** Atractores del modo Corte laser, en u3d (1u = 1cm) sobre y = 0: pieza de 300x200mm. */
+/** Atractores de ejemplo, dentro de la probeta de 20 x 20 cm (1 u = 1 cm). */
 function initialLaserAttractors(): Attractor[] {
   return [
-    createAttractor(new THREE.Vector3(-6, 0, -2), {
-      radius: 9,
+    createAttractor(new THREE.Vector3(-4, 0, -3), {
+      radius: 7,
       strength: 1,
       falloff: 'gaussian',
     }),
-    createAttractor(new THREE.Vector3(8, 0, 4), {
-      radius: 6,
+    createAttractor(new THREE.Vector3(5, 0, 3), {
+      radius: 5,
       strength: 0.8,
       falloff: 'linear',
     }),
     createCurveAttractor(
       toVec3s([
-        [-13, 0, 7],
+        [-8, 0, 7],
         [0, 0, 3],
-        [13, 0, 7],
+        [8, 0, 7],
       ]),
-      { radius: 3.5, strength: 0.9, falloff: 'linear', smooth: [true] },
+      { radius: 3, strength: 0.9, falloff: 'linear', smooth: [true] },
     ),
   ]
 }
@@ -253,9 +247,9 @@ export const useAppStore = create<AppState>((set) => ({
   selectedLaserAttractorId: null,
   laserPreviewBed: false,
   laserImage: null,
-  laserTab: 'design',
-  specimen: { ...DEFAULT_SPECIMEN },
-  specimenIndex: 0,
+  laserPiece: 'specimen',
+  specimenSurname: '',
+  specimenNumber: 1,
   selectedPointIndex: null,
   gizmoMode: 'translate',
 
@@ -394,14 +388,12 @@ export const useAppStore = create<AppState>((set) => ({
 
   setLaserImage: (laserImage) => set({ laserImage }),
 
-  setLaserTab: (laserTab) => set({ laserTab }),
+  setLaserPiece: (laserPiece) => set({ laserPiece }),
 
-  setSpecimenParam: (key, value) =>
-    set((s) => ({ specimen: { ...s.specimen, [key]: value } })),
+  setSpecimenSurname: (specimenSurname) => set({ specimenSurname }),
 
-  setSpecimen: (patch) => set((s) => ({ specimen: { ...s.specimen, ...patch } })),
-
-  setSpecimenIndex: (specimenIndex) => set({ specimenIndex: Math.max(0, specimenIndex) }),
+  setSpecimenNumber: (n) =>
+    set({ specimenNumber: Math.min(99, Math.max(1, Math.round(n) || 1)) }),
 
   addLaserAttractor: (position) =>
     set((s) => {
@@ -490,9 +482,8 @@ export const useAppStore = create<AppState>((set) => ({
       selectedLaserAttractorId: null,
       laserPreviewBed: false,
       laserImage: null,
-      laserTab: 'design',
-      specimen: { ...DEFAULT_SPECIMEN },
-      specimenIndex: 0,
+      laserPiece: 'specimen',
+      specimenNumber: 1,
       selectedPointIndex: null,
       gizmoMode: 'translate',
     }),
