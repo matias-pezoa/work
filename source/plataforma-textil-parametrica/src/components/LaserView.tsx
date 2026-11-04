@@ -25,6 +25,7 @@ import { useAppStore } from '../state/store'
 import type { LaserCutResult } from '../geometry/laserCut'
 import type { Vec2 } from '../geometry/polygon'
 import { pathData } from '../io/exportLaser'
+import type { ImageRect } from '../geometry/laserImage'
 import { mmToThree, threeToMm } from '../utils/units'
 
 interface LaserViewProps {
@@ -33,6 +34,8 @@ interface LaserViewProps {
   set: AttractorSet | null
   /** Marcos de la cama del laser (vista previa de piezas). */
   frames?: readonly (readonly Vec2[])[]
+  /** Imagen de referencia bajo los calados (familia imagen / campo de imagen). */
+  image?: { url: string; rect: ImageRect; invert: boolean } | null
 }
 
 /** Aire alrededor de la pieza al encuadrar, en mm. */
@@ -45,7 +48,7 @@ type Drag =
   | { kind: 'center' }
   | { kind: 'pan'; clientX: number; clientY: number; center: Vec2 }
 
-export function LaserView({ result, set, frames = [] }: LaserViewProps) {
+export function LaserView({ result, set, frames = [], image = null }: LaserViewProps) {
   const attractors = set?.attractors ?? null
   const selectedId = set?.selectedId ?? null
   const selectedPointIndex = set?.selectedPointIndex ?? null
@@ -211,9 +214,25 @@ export function LaserView({ result, set, frames = [] }: LaserViewProps) {
         <pattern id="laser-grid" width={10} height={10} patternUnits="userSpaceOnUse">
           <path d="M10 0H0V10" className="laser-grid-line" />
         </pattern>
+        <clipPath id="laser-sheet-clip">
+          <path d={sheetD} fillRule="evenodd" />
+        </clipPath>
       </defs>
 
       <path d={sheetD} className="laser-sheet" fillRule="evenodd" />
+      {image && (
+        <image
+          href={image.url}
+          x={image.rect.x}
+          y={image.rect.z}
+          width={image.rect.w}
+          height={image.rect.h}
+          preserveAspectRatio="none"
+          clipPath="url(#laser-sheet-clip)"
+          className="laser-image"
+          style={image.invert ? { filter: 'invert(1)' } : undefined}
+        />
+      )}
       <path d={sheetD} fill="url(#laser-grid)" fillRule="evenodd" />
 
       {frames.map((f, k) => (

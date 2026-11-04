@@ -21,6 +21,12 @@ import {
 } from '../geometry/laserCut'
 import { fitBoundaryToWidth, rescaleBoundary, type Vec2 } from '../geometry/polygon'
 import type { ImportedBoundary } from '../io/importSvg'
+import type { ImportedImage } from '../io/importImage'
+import {
+  DEFAULT_SPECIMEN,
+  type SpecimenNumericKey,
+  type SpecimenParams,
+} from '../geometry/laserSpecimens'
 import {
   applyAttractorPatch,
   createAttractor,
@@ -32,6 +38,8 @@ import {
 
 export type AppMode = 'volume' | 'wave' | 'laser'
 export type GizmoMode = 'translate' | 'rotate'
+/** Corte laser: diseno de la pieza o generador de probetas. */
+export type LaserTab = 'design' | 'specimens'
 
 /** Campos numericos de SpikeFieldParams editables desde la UI. */
 export type FieldNumericKey = Exclude<keyof SpikeFieldParams, 'combine' | 'alignToField'>
@@ -73,6 +81,13 @@ export interface AppState {
   selectedLaserAttractorId: string | null
   /** Familia capas: la vista muestra las piezas en la cama en vez del diseno. */
   laserPreviewBed: boolean
+  /** Imagen para la familia imagen / campo de imagen (luminancia reducida). */
+  laserImage: ImportedImage | null
+  laserTab: LaserTab
+  /** Generador de probetas: una probeta por archivo. */
+  specimen: SpecimenParams
+  /** Probeta mostrada en la vista (0..n-1). */
+  specimenIndex: number
 
   /**
    * Punto de control seleccionado del atractor seleccionado del modo activo
@@ -114,6 +129,11 @@ export interface AppState {
   setLaserCombine: (mode: CombineMode) => void
   toggleLaserAlign: () => void
   setLaserPreviewBed: (on: boolean) => void
+  setLaserImage: (image: ImportedImage | null) => void
+  setLaserTab: (tab: LaserTab) => void
+  setSpecimenParam: (key: SpecimenNumericKey, value: number) => void
+  setSpecimen: (patch: Partial<SpecimenParams>) => void
+  setSpecimenIndex: (index: number) => void
   addLaserAttractor: (position: [number, number, number]) => void
   addLaserAttractorCurve: (points: readonly [number, number, number][]) => void
   updateLaserAttractor: (id: string, patch: AttractorPatch) => void
@@ -232,6 +252,10 @@ export const useAppStore = create<AppState>((set) => ({
   laserAttractors: initialLaserAttractors(),
   selectedLaserAttractorId: null,
   laserPreviewBed: false,
+  laserImage: null,
+  laserTab: 'design',
+  specimen: { ...DEFAULT_SPECIMEN },
+  specimenIndex: 0,
   selectedPointIndex: null,
   gizmoMode: 'translate',
 
@@ -368,6 +392,17 @@ export const useAppStore = create<AppState>((set) => ({
 
   setLaserPreviewBed: (laserPreviewBed) => set({ laserPreviewBed }),
 
+  setLaserImage: (laserImage) => set({ laserImage }),
+
+  setLaserTab: (laserTab) => set({ laserTab }),
+
+  setSpecimenParam: (key, value) =>
+    set((s) => ({ specimen: { ...s.specimen, [key]: value } })),
+
+  setSpecimen: (patch) => set((s) => ({ specimen: { ...s.specimen, ...patch } })),
+
+  setSpecimenIndex: (specimenIndex) => set({ specimenIndex: Math.max(0, specimenIndex) }),
+
   addLaserAttractor: (position) =>
     set((s) => {
       const a = createAttractor(new THREE.Vector3(position[0], 0, position[2]))
@@ -454,6 +489,10 @@ export const useAppStore = create<AppState>((set) => ({
       laserAttractors: initialLaserAttractors(),
       selectedLaserAttractorId: null,
       laserPreviewBed: false,
+      laserImage: null,
+      laserTab: 'design',
+      specimen: { ...DEFAULT_SPECIMEN },
+      specimenIndex: 0,
       selectedPointIndex: null,
       gizmoMode: 'translate',
     }),

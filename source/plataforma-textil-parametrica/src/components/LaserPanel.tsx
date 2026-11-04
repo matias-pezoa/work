@@ -1,5 +1,9 @@
 /** Panel del modo Corte laser: cortes y calados parametricos sobre una pieza plana. */
+import { useId, useState, type ReactNode } from 'react'
 import { useAppStore } from '../state/store'
+import { SpecimenPanel, type SpecimenView } from './SpecimenPanel'
+import { importImageFile } from '../io/importImage'
+import { IMAGE_MODE_LABELS, type ImageMode } from '../geometry/laserImage'
 import { ParamSlider } from './ParamSlider'
 import { AttractorEditor } from './AttractorEditor'
 import { ModuleEditor } from './ModuleEditor'
@@ -22,6 +26,10 @@ import {
   SHEET_UI_PARAMS,
   SYMMETRY_ORDER_PARAM,
   BED_UI_PARAMS,
+  IMAGE_BITMAP_UI_PARAMS,
+  IMAGE_HALFTONE_UI_PARAMS,
+  IMAGE_PLACE_UI_PARAMS,
+  IMAGE_TONE_UI_PARAMS,
   layersUiParams,
 } from '../geometry/laserCut'
 import type {
@@ -51,8 +59,10 @@ import {
   type SwatchVariant,
 } from '../geometry/laserSwatch'
 import {
+  downloadBedAi,
   downloadBedDxf,
   downloadBedSvg,
+  downloadLaserAi,
   downloadLaserDxf,
   downloadLaserSvg,
   downloadSwatchSvg,
@@ -72,6 +82,8 @@ interface LaserPanelProps {
   bed: BedLayout | null
   /** Puas del modo Volumen disponibles para la familia "huella". */
   spikeCount: number
+  /** Cama de probetas (solo con la pestana Probetas activa). */
+  specimens: SpecimenView | null
 }
 
 const FAMILY_HINTS: Record<LaserFamily, string> = {
@@ -100,6 +112,11 @@ const FAMILY_HINTS: Record<LaserFamily, string> = {
     'arista (fila de agujeros), sus bordes forman el relieve. Los lobulos ondulan las ' +
     'capas y el giro los desplaza de una a otra; los atractores las empujan. Al exportar, ' +
     'las piezas salen distribuidas en la cama del laser, numeradas al costado.',
+  image:
+    'Carga una imagen: se pasa a escala de grises y a un mapa de bits sobre una grilla, ' +
+    'y cada pixel oscuro se vuelve un calado. Semitono: el tamano sigue el tono. Umbral: ' +
+    'pixel lleno o nada. Tramado: 1 bit con difusion de error, los grises quedan como ' +
+    'densidad de calados. El puente entre pixeles se respeta igual que en el calado.',
   footprint:
     'Un calado circular en la base de cada pua del modo Volumen (mismas posiciones y base). ' +
     'Impreso encima, el filamento atraviesa el calado y se ancla a la tela. Se ajusta ' +
@@ -115,7 +132,44 @@ const SYMMETRY_HINT: Record<LaserSymmetry, string> = {
   kaleido: 'N copias giradas y sus reflejos (2N): un caleidoscopio.',
 }
 
-export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
+export function LaserPanel({ result, bed, spikeCount, specimens }: LaserPanelProps) {
+  const tab = useAppStore((s) => s.laserTab)
+  const setTab = useAppStore((s) => s.setLaserTab)
+  const tabs = (
+    <div className="seg laser-tabs">
+      <button
+        type="button"
+        className={tab === 'design' ? 'active' : ''}
+        onClick={() => setTab('design')}
+      >
+        Diseno
+      </button>
+      <button
+        type="button"
+        className={tab === 'specimens' ? 'active' : ''}
+        onClick={() => setTab('specimens')}
+      >
+        Generador de probetas
+      </button>
+    </div>
+  )
+  if (tab === 'specimens') {
+    return (
+      <div className="panel">
+        {tabs}
+        <SpecimenPanel view={specimens} />
+      </div>
+    )
+  }
+  return <DesignPanel result={result} bed={bed} spikeCount={spikeCount} tabs={tabs} />
+}
+
+function DesignPanel({
+  result,
+  bed,
+  spikeCount,
+  tabs,
+}: Omit<LaserPanelProps, 'specimens'> & { tabs: ReactNode }) {
   const laser = useAppStore((s) => s.laser)
   const setParam = useAppStore((s) => s.setLaserParam)
   const setOption = useAppStore((s) => s.setLaserOption)
@@ -130,7 +184,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
   const baseShape = useAppStore((s) => s.baseShape)
 
   const family = laser.family
-  const usesField = family !== 'footprint'
+  const laserImage = useAppStore((s) => s.laserImage)
+  const imageField = laser.imgAsField && laserImage !== null && family !== 'image'
+  const usesField = family !== 'footprint' && family !== 'image'
   const usesElements = ELEMENT_FAMILIES.has(family)
   const usesAlign = family === 'perforation' || family === 'scales' || family === 'module'
   const usesCellFlip = family === 'hinge' || family === 'module'
@@ -164,6 +220,7 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
 
   return (
     <div className="panel">
+      {tabs}
       <section>
         <h3>Fabricable por construccion</h3>
         <p className="hint">
@@ -265,6 +322,28 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
         )}
 
         {FAMILY_UI_PARAMS[family].map(slider)}
+
+        {family === 'image' && (
+          <>
+            <div className="seg">
+              {(Object.keys(IMAGE_MODE_LABELS) as ImageMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={laser.imgMode === m ? 'active' : ''}
+                  onClick={() => setOption('imgMode', m)}
+                >
+                  {IMAGE_MODE_LABELS[m]}
+                </button>
+              ))}
+            </div>
+            {(laser.imgMode === 'halftone'
+              ? IMAGE_HALFTONE_UI_PARAMS
+              : IMAGE_BITMAP_UI_PARAMS
+            ).map(slider)}
+            <ImageImporter slider={slider} />
+          </>
+        )}
       </section>
 
       {usesField && (
@@ -283,6 +362,15 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
             ))}
           </div>
           {laser.distribution !== 'uniform' && FIELD_LASER_UI_PARAMS.map(slider)}
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={laser.imgAsField}
+              onChange={() => setOption('imgAsField', !laser.imgAsField)}
+            />
+            Usar una imagen como campo (lo oscuro atrae)
+          </label>
+          {laser.imgAsField && <ImageImporter slider={slider} />}
           {usesAlign && (
             <label className="check">
               <input
@@ -438,7 +526,7 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
 
       <BaseShapeImporter />
 
-      {usesField && laser.distribution !== 'uniform' ? (
+      {usesField && !imageField && laser.distribution !== 'uniform' ? (
         <AttractorEditor
           set={attractorSet}
           planeSize={editorPlaneSize}
@@ -563,6 +651,14 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               >
                 DXF cama (mm)
               </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={!bed}
+                onClick={() => bed && downloadBedAi(bed, 'cama-capas')}
+              >
+                AI (Illustrator 3)
+              </button>
             </div>
           </>
         ) : (
@@ -580,6 +676,13 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               onClick={() => downloadLaserDxf(result, filename)}
             >
               DXF (mm)
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => downloadLaserAi(result, filename)}
+            >
+              AI (Illustrator 3)
             </button>
           </div>
         )}
@@ -631,5 +734,84 @@ function HingeIcon({ pattern }: { pattern: HingePattern }) {
     <svg className="hinge-icon" viewBox={box} aria-hidden="true">
       <path d={d} />
     </svg>
+  )
+}
+
+/**
+ * Carga de imagen (familia imagen o imagen como campo): archivo, miniatura y
+ * los ajustes de tono y encuadre compartidos por ambos usos.
+ */
+function ImageImporter({ slider }: { slider: (p: LaserParam) => ReactNode }) {
+  const image = useAppStore((s) => s.laserImage)
+  const setImage = useAppStore((s) => s.setLaserImage)
+  const laser = useAppStore((s) => s.laser)
+  const setOption = useAppStore((s) => s.setLaserOption)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const inputId = useId()
+
+  const handleFile = async (file: File) => {
+    setBusy(true)
+    setError(null)
+    try {
+      setImage(await importImageFile(file))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo leer la imagen.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="image-importer">
+      <label htmlFor={inputId} className="file-drop">
+        {busy
+          ? 'Leyendo…'
+          : image
+            ? `Cambiar imagen (${image.fileName})`
+            : '+ Cargar imagen (PNG, JPG, WebP, SVG)'}
+      </label>
+      <input
+        id={inputId}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = '' // permite re-subir el mismo archivo
+          if (file) void handleFile(file)
+        }}
+      />
+      {error && <p className="hint error">{error}</p>}
+      {image ? (
+        <>
+          <img
+            className="image-thumb"
+            src={image.previewUrl}
+            alt=""
+            style={laser.imgInvert ? { filter: 'invert(1)' } : undefined}
+          />
+          <p className="hint">
+            {image.width} x {image.height} px (reducida para el calculo). La imagen cubre
+            la pieza; ajusta zoom y desplazamiento para encuadrarla.
+          </p>
+          {IMAGE_TONE_UI_PARAMS.map(slider)}
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={laser.imgInvert}
+              onChange={() => setOption('imgInvert', !laser.imgInvert)}
+            />
+            Invertir (calar lo claro)
+          </label>
+          {IMAGE_PLACE_UI_PARAMS.map(slider)}
+          <button type="button" className="ghost" onClick={() => setImage(null)}>
+            Quitar imagen
+          </button>
+        </>
+      ) : (
+        <p className="hint">Sin imagen cargada no se genera ningun calado.</p>
+      )}
+    </div>
   )
 }

@@ -13,8 +13,11 @@ import type { CutLayer, CutPath, LaserCutResult, TextLabel } from '../geometry/l
 import { LAYER_ORDER } from '../geometry/laserCut'
 import type { SwatchSheet } from '../geometry/laserSwatch'
 import type { BedLayout } from '../geometry/laserBed'
+import type { Specimen } from '../geometry/laserSpecimens'
 import type { Vec2 } from '../geometry/polygon'
+import { textToStrokes } from '../geometry/strokeFont'
 import { triggerDownload } from './download'
+import { buildZip } from './zip'
 
 export const LAYER_COLORS: Record<CutLayer, { hex: string; aci: number; name: string }> =
   {
@@ -50,12 +53,14 @@ export function laserToSvg(
   title = 'Corte laser',
   labels: readonly SvgLabel[] = [],
   frames: readonly (readonly Vec2[])[] = [],
+  /** Aire alrededor de `bounds`; 0 = el lienzo mide exactamente `bounds` (cama de probetas). */
+  padMm = SVG_PAD_MM,
 ): string {
   const { minX, maxX, minZ, maxZ } = result.bounds
-  const x0 = minX - SVG_PAD_MM
-  const y0 = minZ - SVG_PAD_MM
-  const w = maxX - minX + 2 * SVG_PAD_MM
-  const h = maxZ - minZ + 2 * SVG_PAD_MM
+  const x0 = minX - padMm
+  const y0 = minZ - padMm
+  const w = maxX - minX + 2 * padMm
+  const h = maxZ - minZ + 2 * padMm
 
   const groups = LAYER_ORDER.map((layer) => {
     const paths = result.paths.filter((p) => p.layer === layer)
@@ -207,6 +212,148 @@ export function laserToDxf(
   g(0, 'EOF')
 
   return out.join('\n') + '\n'
+}
+
+/** Puntos PostScript por milimetro. */
+const PT_PER_MM = 72 / 25.4
+
+/** Colores de trazo CMYK (operador `K`) por capa en el .ai. */
+const AI_CMYK: Record<CutLayer, string> = {
+  calado: '1 1 0 0',
+  corte: '1 0 1 0',
+  contorno: '0 1 1 0',
+}
+
+/**
+ * Adobe Illustrator 3 (.ai): PostScript/EPS de texto plano, el formato "AI"
+ * que importan RDWorks, LaserCut, LightBurn y casi cualquier software de
+ * laser. Sin capas (llegaron en Illustrator 5): cada tipo de corte va en su
+ * grupo (`u`...`U`) con su color de trazo, en LAYER_ORDER, y el software lo
+ * asigna por color. Los rotulos se graban como trazos negros (tipografia de
+ * trazo, strokeFont.ts) porque el texto AI3 no se lee de forma fiable. El
+ * marco de la cama NO se incluye (no hay capa "no cortar"): la mesa de
+ * trabajo (`%%BoundingBox`) ya mide lo que la cama.
+ *
+ * Unidades en puntos (1 mm = 72/25.4 pt), Y hacia arriba como en DXF.
+ */
+export function laserToAi(
+  result: Pick<LaserCutResult, 'paths' | 'bounds'>,
+  title = 'Corte laser',
+  labels: readonly TextLabel[] = [],
+  padMm = SVG_PAD_MM,
+): string {
+  const { minX, maxX, minZ, maxZ } = result.bounds
+  const x0 = minX - padMm
+  const z1 = maxZ + padMm
+  const wPt = (maxX - minX + 2 * padMm) * PT_PER_MM
+  const hPt = (maxZ - minZ + 2 * padMm) * PT_PER_MM
+  const px = (x: number) => fmt((x - x0) * PT_PER_MM)
+  const py = (z: number) => fmt((z1 - z) * PT_PER_MM)
+  const lines: string[] = []
+  const path = (points: readonly Vec2[], closed: boolean) => {
+    points.forEach(([x, z], k) => lines.push(`${px(x)} ${py(z)} ${k ? 'L' : 'm'}`))
+    lines.push(closed ? 's' : 'S')
+  }
+
+  lines.push(
+    '%!PS-Adobe-2.0 EPSF-1.2',
+    '%%Creator: Adobe Illustrator(TM) 3.2',
+    `%%Title: (${psString(title)})`,
+    '%%For: (Plataforma parametrica textil)',
+    `%%BoundingBox: 0 0 ${Math.ceil(wPt)} ${Math.ceil(hPt)}`,
+    `%%HiResBoundingBox: 0 0 ${fmt(wPt)} ${fmt(hPt)}`,
+    '%%DocumentProcessColors: Cyan Magenta Yellow Black',
+    '%%DocumentFonts:',
+    `%%TemplateBox: ${fmt(wPt / 2)} ${fmt(hPt / 2)} ${fmt(wPt / 2)} ${fmt(hPt / 2)}`,
+    `%%TileBox: 0 0 ${fmt(wPt)} ${fmt(hPt)}`,
+    '%%EndComments',
+    '%%EndProlog',
+    '%%BeginSetup',
+    '%%EndSetup',
+    // planitud, extremos y uniones redondeados, trazo fino (0.1 mm), sin guiones
+    `0 i 1 J 1 j ${fmt(0.1 * PT_PER_MM)} w 4 M []0 d`,
+  )
+  // grabado primero, con la pieza todavia fija.
+  if (labels.length) {
+    lines.push('u', '0 0 0 1 K')
+    for (const l of labels) for (const s of textToStrokes(l)) path(s, false)
+    lines.push('U')
+  }
+  for (const layer of LAYER_ORDER) {
+    const paths = result.paths.filter((p) => p.layer === layer && p.points.length >= 2)
+    if (paths.length === 0) continue
+    lines.push('u', `${AI_CMYK[layer]} K`)
+    for (const p of paths) path(p.points, p.closed)
+    lines.push('U')
+  }
+  lines.push('%%PageTrailer', '%%Trailer', '%%EOF')
+  return lines.join('\n') + '\n'
+}
+
+function psString(s: string): string {
+  return s.replace(/[()\\]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, '?')
+}
+
+export function downloadLaserAi(result: LaserCutResult, filename = 'corte-laser'): void {
+  triggerDownload(
+    new Blob([laserToAi(result, filename)], { type: 'application/postscript' }),
+    `${filename}.ai`,
+  )
+}
+
+export function downloadBedAi(bed: BedLayout, filename = 'cama-laser'): void {
+  triggerDownload(
+    new Blob([laserToAi(bed, filename, bed.labels)], { type: 'application/postscript' }),
+    `${filename}.ai`,
+  )
+}
+
+export type SpecimenFormat = 'svg' | 'dxf' | 'ai'
+
+const SPECIMEN_MIME: Record<SpecimenFormat, string> = {
+  svg: 'image/svg+xml',
+  dxf: 'application/dxf',
+  ai: 'application/postscript',
+}
+
+/**
+ * Archivo de una probeta: mide exactamente su formato (sin aire), asi el
+ * origen del archivo es la esquina de la pieza en la mesa.
+ */
+export function specimenToFile(specimen: Specimen, format: SpecimenFormat): string {
+  const title = specimen.name
+  return format === 'svg'
+    ? laserToSvg(specimen, title, specimen.labels, specimen.frames, 0)
+    : format === 'dxf'
+      ? laserToDxf(specimen, specimen.labels, specimen.frames)
+      : laserToAi(specimen, title, specimen.labels, 0)
+}
+
+export function downloadSpecimen(specimen: Specimen, format: SpecimenFormat): void {
+  triggerDownload(
+    new Blob([specimenToFile(specimen, format)], { type: SPECIMEN_MIME[format] }),
+    `${specimen.name}.${format}`,
+  )
+}
+
+/** Todas las probetas en un .zip, un archivo por probeta (y por formato). */
+export function downloadSpecimensZip(
+  specimens: readonly Specimen[],
+  formats: readonly SpecimenFormat[],
+  filename = 'probetas-laser',
+): void {
+  const zip = buildZip(
+    specimens.flatMap((s) =>
+      formats.map((format) => ({
+        name: `${s.name}.${format}`,
+        content: specimenToFile(s, format),
+      })),
+    ),
+  )
+  triggerDownload(
+    new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }),
+    `${filename}.zip`,
+  )
 }
 
 export function downloadLaserSvg(result: LaserCutResult, filename = 'corte-laser'): void {

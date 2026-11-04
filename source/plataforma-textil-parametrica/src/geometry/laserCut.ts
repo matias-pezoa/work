@@ -22,6 +22,10 @@
  *                  plancha rigida. El campo modula el puente entre cortes.
  *   - module       Modulo personalizado: trazos dibujados (o importados) en
  *                  una celda, repetidos por la disposicion.
+ *   - image        Imagen -> mapa de bits -> calados: semitono, umbral o
+ *                  tramado sobre una grilla (ver laserImage.ts). La imagen
+ *                  tambien puede reemplazar al campo en las demas familias
+ *                  (`imgAsField`).
  *
  * Calado, escamas, bisagra y modulo son familias "por elementos": se
  * disponen en grilla o en anillos (radial) y pasan por un control de puente
@@ -91,6 +95,13 @@ import {
   type Shape,
 } from './laserPattern'
 import { buildLayers, type LayerEdge, type LayerJoin } from './laserLayers'
+import {
+  createImageSampler,
+  toOneBit,
+  type ImageMode,
+  type ImageSampler,
+  type LaserBitmap,
+} from './laserImage'
 
 /** Piso absoluto del puente de material entre cortes, en mm. */
 export const MIN_BRIDGE_MM = 1
@@ -100,7 +111,14 @@ export const MIN_FEATURE_MM = 1
 export const MAX_ELEMENTS = 20000
 
 export type LaserFamily =
-  'perforation' | 'kirigami' | 'scales' | 'hinge' | 'module' | 'layers' | 'footprint'
+  | 'perforation'
+  | 'kirigami'
+  | 'scales'
+  | 'hinge'
+  | 'module'
+  | 'layers'
+  | 'image'
+  | 'footprint'
 
 export const FAMILY_LABELS: Record<LaserFamily, string> = {
   perforation: 'Calado',
@@ -109,6 +127,7 @@ export const FAMILY_LABELS: Record<LaserFamily, string> = {
   hinge: 'Bisagra kerf',
   module: 'Modulo',
   layers: 'Capas',
+  image: 'Imagen',
   footprint: 'Huella puas',
 }
 
@@ -283,6 +302,27 @@ export interface LaserParams {
   layerEdgeHoles: number
   layerHoleInsetMm: number
 
+  // --- imagen (familia image, o como campo en las demas) ---
+  imgMode: ImageMode
+  /** Paso de la grilla: cada celda es un "pixel" del mapa de bits. */
+  imgPitchMm: number
+  /** Lados del calado (4 = pixel cuadrado, 24 = circulo). */
+  imgSides: number
+  /** Semitono: tamano en blanco / en negro (x maximo que permite el puente). */
+  imgSizeMin: number
+  imgSizeMax: number
+  /** Umbral de oscuridad para el mapa de bits de 1 bit. */
+  imgThreshold: number
+  imgContrast: number
+  imgBrightness: number
+  imgGamma: number
+  imgInvert: boolean
+  imgScale: number
+  imgOffsetXMm: number
+  imgOffsetZMm: number
+  /** La oscuridad de la imagen reemplaza al campo de atractores en las demas familias. */
+  imgAsField: boolean
+
   // --- cama del laser (export de piezas sueltas) ---
   bedWidthMm: number
   bedHeightMm: number
@@ -363,6 +403,21 @@ export const DEFAULT_LASER: LaserParams = {
   layerHoleMm: 2,
   layerEdgeHoles: 3,
   layerHoleInsetMm: 5,
+
+  imgMode: 'halftone',
+  imgPitchMm: 5,
+  imgSides: 24,
+  imgSizeMin: 0,
+  imgSizeMax: 1,
+  imgThreshold: 0.5,
+  imgContrast: 1,
+  imgBrightness: 0,
+  imgGamma: 1,
+  imgInvert: false,
+  imgScale: 1,
+  imgOffsetXMm: 0,
+  imgOffsetZMm: 0,
+  imgAsField: false,
 
   bedWidthMm: 600,
   bedHeightMm: 400,
@@ -583,6 +638,26 @@ export const FAMILY_UI_PARAMS: Record<LaserFamily, readonly LaserParam[]> = {
       step: 0.01,
       default: 0.5,
       unit: 'x',
+    },
+  ],
+  image: [
+    {
+      key: 'imgPitchMm',
+      label: 'Paso de grilla (pixel)',
+      min: 2,
+      max: 30,
+      step: 0.25,
+      default: 5,
+      unit: 'mm',
+    },
+    {
+      key: 'imgSides',
+      label: 'Lados (4 = pixel, 24 = circulo)',
+      min: 3,
+      max: 24,
+      step: 1,
+      default: 24,
+      unit: '-',
     },
   ],
   // depende del patron elegido: ver hingeUiParams
@@ -833,6 +908,111 @@ export function layersUiParams(join: LayerJoin): LaserParam[] {
   return out
 }
 
+/** Semitono: tamano del calado en blanco y en negro. */
+export const IMAGE_HALFTONE_UI_PARAMS: readonly LaserParam[] = [
+  {
+    key: 'imgSizeMin',
+    label: 'Tamano en blanco (x maximo)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0,
+    unit: '-',
+  },
+  {
+    key: 'imgSizeMax',
+    label: 'Tamano en negro (x maximo)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 1,
+    unit: '-',
+  },
+]
+
+/** Mapa de bits de 1 bit: umbral y tamano del pixel calado. */
+export const IMAGE_BITMAP_UI_PARAMS: readonly LaserParam[] = [
+  {
+    key: 'imgThreshold',
+    label: 'Umbral (oscuridad)',
+    min: 0.02,
+    max: 0.98,
+    step: 0.01,
+    default: 0.5,
+    unit: '-',
+  },
+  {
+    key: 'imgSizeMax',
+    label: 'Tamano del pixel (x maximo)',
+    min: 0.1,
+    max: 1,
+    step: 0.01,
+    default: 1,
+    unit: '-',
+  },
+]
+
+/** Tono y encuadre de la imagen (familia imagen y "imagen como campo"). */
+export const IMAGE_TONE_UI_PARAMS: readonly LaserParam[] = [
+  {
+    key: 'imgContrast',
+    label: 'Contraste',
+    min: 0,
+    max: 4,
+    step: 0.05,
+    default: 1,
+    unit: 'x',
+  },
+  {
+    key: 'imgBrightness',
+    label: 'Brillo',
+    min: -1,
+    max: 1,
+    step: 0.01,
+    default: 0,
+    unit: '-',
+  },
+  {
+    key: 'imgGamma',
+    label: 'Gamma',
+    min: 0.2,
+    max: 4,
+    step: 0.05,
+    default: 1,
+    unit: '-',
+  },
+]
+
+export const IMAGE_PLACE_UI_PARAMS: readonly LaserParam[] = [
+  {
+    key: 'imgScale',
+    label: 'Zoom de la imagen',
+    min: 0.2,
+    max: 5,
+    step: 0.01,
+    default: 1,
+    unit: 'x',
+  },
+  {
+    key: 'imgOffsetXMm',
+    label: 'Desplazar imagen X',
+    min: -300,
+    max: 300,
+    step: 1,
+    default: 0,
+    unit: 'mm',
+  },
+  {
+    key: 'imgOffsetZMm',
+    label: 'Desplazar imagen Z',
+    min: -300,
+    max: 300,
+    step: 1,
+    default: 0,
+    unit: 'mm',
+  },
+]
+
 export const BED_UI_PARAMS: readonly LaserParam[] = [
   {
     key: 'bedWidthMm',
@@ -950,6 +1130,8 @@ export interface LaserInput {
   footprints?: readonly SpikeFootprint[]
   /** Solo familia `footprint` sin base importada: lado del panel de Volumen (mm). */
   footprintPlaneMm?: number
+  /** Imagen en escala de grises (familia `image`, o campo con `imgAsField`). */
+  image?: LaserBitmap | null
 }
 
 export interface LaserCutResult {
@@ -999,6 +1181,10 @@ interface Ctx {
   out: CutPath[]
   pieces: LaserPiece[]
   labels: TextLabel[]
+  /** Imagen apoyada sobre la pieza (null si no hay imagen cargada). */
+  image: ImageSampler | null
+  /** true: la oscuridad de la imagen reemplaza al campo de atractores. */
+  imageField: boolean
   stats: {
     rejectedByEdge: number
     rejectedByBridge: number
@@ -1022,8 +1208,14 @@ export function buildLaserCut(
     (sb.minX + sb.maxX) / 2 + params.centerXMm,
     (sb.minZ + sb.maxZ) / 2 + params.centerZMm,
   ]
+  const image = input.image ? createImageSampler(input.image, sb, params) : null
+  const imageField =
+    image !== null &&
+    params.imgAsField &&
+    params.family !== 'image' &&
+    params.family !== 'footprint'
   const fieldAttractors =
-    params.family === 'footprint'
+    params.family === 'footprint' || params.family === 'image' || imageField
       ? []
       : symmetrizeAttractors(attractors, params.symmetry, params.symmetryOrder, {
           x: mmToThree(center[0]),
@@ -1041,6 +1233,8 @@ export function buildLaserCut(
     out: [],
     pieces: [],
     labels: [],
+    image,
+    imageField,
     stats: {
       rejectedByEdge: 0,
       rejectedByBridge: 0,
@@ -1069,6 +1263,9 @@ export function buildLaserCut(
       break
     case 'layers':
       buildLayerPieces(ctx)
+      break
+    case 'image':
+      buildImage(ctx, guard)
       break
     case 'footprint':
       buildFootprint(ctx, input.footprints ?? [])
@@ -1192,6 +1389,7 @@ const _p = new THREE.Vector3()
 
 /** Campo en un punto del plano (mm). Los atractores viven en unidades Three. */
 function fieldAt(ctx: Ctx, x: number, z: number): FieldAt {
+  if (ctx.imageField && ctx.image) return imageFieldAt(ctx.image, x, z)
   _p.set(mmToThree(x), 0, mmToThree(z))
   const s = sampleField(_p, ctx.attractors, ctx.params.combine)
   if (!s.direction) return { value: s.value, dir: null }
@@ -1199,6 +1397,21 @@ function fieldAt(ctx: Ctx, x: number, z: number): FieldAt {
   return {
     value: s.value,
     dir: len > 1e-9 ? [s.direction.x / len, s.direction.z / len] : null,
+  }
+}
+
+/** Paso de la diferencia finita del gradiente de la imagen, en mm. */
+const IMAGE_GRADIENT_MM = 2
+
+/** Imagen como campo: valor = oscuridad, direccion = hacia donde se oscurece. */
+function imageFieldAt(img: ImageSampler, x: number, z: number): FieldAt {
+  const h = IMAGE_GRADIENT_MM
+  const gx = img.darkness(x + h, z) - img.darkness(x - h, z)
+  const gz = img.darkness(x, z + h) - img.darkness(x, z - h)
+  const len = Math.hypot(gx, gz)
+  return {
+    value: img.darkness(x, z, h),
+    dir: len > 1e-6 ? [gx / len, gz / len] : null,
   }
 }
 
@@ -1409,6 +1622,97 @@ function buildPerforation(ctx: Ctx, guard: BridgeGuard): void {
     emitElement(ctx, guard, pl, [
       { points: ellipsePolygon(0, 0, a, b, p.perfSides, angle), closed: true },
     ])
+  })
+}
+
+// ------------------------------------------------------------------ imagen
+
+/**
+ * Imagen -> mapa de bits -> calados. Grilla cuadrada de `imgPitchMm` centrada
+ * en la pieza (semitono con circulos/poligonos: hexagonal, como el calado por
+ * campo). Puente por construccion: un pixel cuadrado mide a lo sumo
+ * `paso - puente` de lado (vecinos a `paso`, diagonales a paso*raiz(2)); un
+ * poligono, radio circunscrito <= (paso - puente)/2.
+ */
+function buildImage(ctx: Ctx, guard: BridgeGuard): void {
+  const img = ctx.image
+  if (!img) return
+  const p = ctx.params
+  const pitch = Math.max(p.imgPitchMm, MIN_FEATURE_MM + ctx.bridge)
+  const square = Math.round(p.imgSides) === 4
+  const hex = p.imgMode === 'halftone' && !square
+  const rowStep = hex ? (pitch * Math.sqrt(3)) / 2 : pitch
+  const free = pitch - ctx.bridge
+
+  // celdas fila por fila: el tramado necesita recorrerlas en orden.
+  const b = polygonBounds(ctx.sheet.outer)
+  const cx = (b.minX + b.maxX) / 2
+  const cz = (b.minZ + b.maxZ) / 2
+  const ni = Math.ceil((b.maxX - b.minX) / pitch / 2) + 1
+  const nj = Math.ceil((b.maxZ - b.minZ) / rowStep / 2) + 1
+  const cells: { x: number; z: number; i: number; j: number }[][] = []
+  for (let j = -nj; j <= nj; j++) {
+    const row: { x: number; z: number; i: number; j: number }[] = []
+    const offset = hex && Math.abs(j) % 2 === 1 ? pitch / 2 : 0
+    for (let i = -ni; i <= ni; i++) {
+      row.push({ x: cx + i * pitch + offset, z: cz + j * rowStep, i, j })
+    }
+    cells.push(row)
+  }
+  const dark = cells.map((row) => row.map((c) => img.darkness(c.x, c.z, pitch)))
+  const bits =
+    p.imgMode === 'halftone'
+      ? null
+      : toOneBit(dark, p.imgThreshold, p.imgMode === 'dither')
+
+  cells.forEach((row, r) => {
+    row.forEach((c, k) => {
+      if (ctx.out.length >= MAX_ELEMENTS) return
+      if (!pointInBoundary(c.x, c.z, ctx.sheet)) return
+      let frac: number
+      if (bits) {
+        if (!bits[r][k]) return
+        frac = clamp(p.imgSizeMax, 0, 1)
+      } else {
+        const d = dark[r][k]
+        if (d <= 1e-3) return
+        frac = clamp(lerp(p.imgSizeMin, p.imgSizeMax, d), 0, 1)
+      }
+      let shape: Vec2[]
+      if (square) {
+        const half = (free * frac) / 2
+        if (2 * half < MIN_FEATURE_MM) {
+          ctx.stats.skippedBySize++
+          return
+        }
+        shape = [
+          [-half, -half],
+          [half, -half],
+          [half, half],
+          [-half, half],
+        ]
+      } else {
+        const rad = (free / 2) * frac
+        // el diametro menor de un poligono de n lados es 2r*cos(pi/n)
+        if (2 * rad * Math.cos(Math.PI / Math.max(3, p.imgSides)) < MIN_FEATURE_MM) {
+          ctx.stats.skippedBySize++
+          return
+        }
+        shape = ellipsePolygon(0, 0, rad, rad, p.imgSides, 0)
+      }
+      const pl: Placement = {
+        x: c.x,
+        z: c.z,
+        angle: 0,
+        cellW: pitch,
+        cellH: rowStep,
+        i: c.i,
+        j: c.j,
+        map: (lx, lz) => [c.x + lx, c.z + lz],
+        warped: false,
+      }
+      emitElement(ctx, guard, pl, [{ points: shape, closed: true }])
+    })
   })
 }
 

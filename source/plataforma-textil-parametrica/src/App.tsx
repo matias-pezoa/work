@@ -20,6 +20,10 @@ import type { SpikePlacement } from './geometry/spikeField'
 import { buildWaveField } from './geometry/waveField'
 import { buildLaserCut, type LaserCutResult } from './geometry/laserCut'
 import { layoutOnBed, type BedLayout } from './geometry/laserBed'
+import { buildSpecimen, planSpecimens } from './geometry/laserSpecimens'
+import type { SpecimenView } from './components/SpecimenPanel'
+import { imageRect } from './geometry/laserImage'
+import { polygonBounds } from './geometry/polygon'
 import { threeToMm } from './utils/units'
 import {
   attractorSetFrom,
@@ -41,7 +45,10 @@ export default function App() {
   const laserFamily = useAppStore((s) => s.laser.family)
   const laserSet = useAttractorSet('laser')
   const bed = useLaserBed(laser)
+  const laserTab = useAppStore((s) => s.laserTab)
+  const specimens = useSpecimens(mode === 'laser' && laserTab === 'specimens', laser)
   const previewBed = useAppStore((s) => s.laserPreviewBed) && bed !== null
+  const underlay = useImageUnderlay(laser)
   useDeleteShortcut(mode === 'laser' && laserFamily === 'footprint' ? null : mode)
 
   return (
@@ -61,7 +68,20 @@ export default function App() {
       </header>
 
       <main className="viewport">
-        {mode === 'laser' && laser && previewBed && bed ? (
+        {mode === 'laser' && laser && specimens?.current ? (
+          <LaserView
+            key="specimens"
+            result={{
+              ...laser,
+              paths: specimens.current.paths,
+              bounds: specimens.current.bounds,
+              sheet: { outer: [], holes: [] },
+              labels: specimens.current.labels,
+            }}
+            frames={specimens.current.frames}
+            set={null}
+          />
+        ) : mode === 'laser' && laser && previewBed && bed ? (
           // key propia: el zoom/encuadre de la cama no se arrastra a la vista de diseno.
           <LaserView
             key="bed"
@@ -79,7 +99,12 @@ export default function App() {
           <LaserView
             key="design"
             result={laser}
-            set={laserFamily === 'footprint' ? null : laserSet}
+            set={
+              laserFamily === 'footprint' || laserFamily === 'image' || underlay?.field
+                ? null
+                : laserSet
+            }
+            image={underlay}
           />
         ) : (
           <Viewport>
@@ -142,7 +167,12 @@ export default function App() {
         {mode === 'volume' && <SpikeFieldPanel result={spikes} />}
         {mode === 'wave' && <WaveFieldPanel result={waves} />}
         {mode === 'laser' && laser && (
-          <LaserPanel result={laser} bed={bed} spikeCount={spikes.placements.length} />
+          <LaserPanel
+            result={laser}
+            bed={bed}
+            spikeCount={spikes.placements.length}
+            specimens={specimens}
+          />
         )}
       </aside>
     </div>
@@ -199,6 +229,7 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
   const attractors = useAppStore((s) => s.laserAttractors)
   const baseShape = useAppStore((s) => s.baseShape)
   const spikePlaneSize = useAppStore((s) => s.field.planeSize)
+  const image = useAppStore((s) => s.laserImage)
 
   return useMemo(() => {
     if (!active) return null
@@ -214,8 +245,78 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
       boundary: baseShape,
       footprints,
       footprintPlaneMm: threeToMm(spikePlaneSize),
+      image,
     })
-  }, [active, laser, attractors, baseShape, placements, spikePlaneSize])
+  }, [active, laser, attractors, baseShape, placements, spikePlaneSize, image])
+}
+
+/**
+ * Generador de probetas: solo se calcula con su pestana activa, y solo la
+ * probeta a la vista (el resto se arma al exportar).
+ */
+function useSpecimens(
+  active: boolean,
+  design: LaserCutResult | null,
+): SpecimenView | null {
+  const laser = useAppStore((s) => s.laser)
+  const specimen = useAppStore((s) => s.specimen)
+  const index = useAppStore((s) => s.specimenIndex)
+  const attractors = useAppStore((s) => s.laserAttractors)
+  const image = useAppStore((s) => s.laserImage)
+  const designBounds = design ? polygonBounds(design.sheet.outer) : undefined
+  const key = designBounds
+    ? [designBounds.minX, designBounds.maxX, designBounds.minZ, designBounds.maxZ].join()
+    : ''
+  const series = useMemo(
+    () => (active ? planSpecimens(laser, specimen) : null),
+    [active, laser, specimen],
+  )
+  const total = series?.plans.length ?? 0
+  const at = Math.min(index, Math.max(0, total - 1))
+  // designBounds se compara por valor (key): el objeto cambia en cada calculo del diseno.
+  const input = useMemo(
+    () => ({ image, designBounds }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [image, key],
+  )
+  const current = useMemo(
+    () =>
+      series && total > 0
+        ? buildSpecimen(series.plans[at], total, attractors, laser, specimen, input)
+        : null,
+    [series, total, at, attractors, laser, specimen, input],
+  )
+  return useMemo(
+    () =>
+      series && {
+        series,
+        index: at,
+        current,
+        buildAll: () =>
+          series.plans.map((p) =>
+            p.number === current?.number
+              ? current
+              : buildSpecimen(p, total, attractors, laser, specimen, input),
+          ),
+      },
+    [series, at, current, total, attractors, laser, specimen, input],
+  )
+}
+
+/** Imagen bajo los calados (familia imagen o imagen como campo), en mm de la pieza. */
+function useImageUnderlay(design: LaserCutResult | null) {
+  const laser = useAppStore((s) => s.laser)
+  const image = useAppStore((s) => s.laserImage)
+  if (!design || !image) return null
+  const field =
+    laser.imgAsField && laser.family !== 'image' && laser.family !== 'footprint'
+  if (laser.family !== 'image' && !field) return null
+  return {
+    url: image.previewUrl,
+    rect: imageRect(image, polygonBounds(design.sheet.outer), laser),
+    invert: laser.imgInvert,
+    field,
+  }
 }
 
 /** Familia capas: cada capa como pieza suelta, distribuida en la cama del laser. */
