@@ -29,10 +29,24 @@ const SVG_PAD_MM = 5
 
 const fmt = (n: number) => (Math.abs(n) < 5e-4 ? '0' : n.toFixed(3))
 
+/**
+ * Vertices a escribir de un trazo: si es cerrado, se repite el primero al
+ * final. La marca de cerrado (`Z`, `s`, flag 70) se mantiene, pero varios
+ * programas de laser (RDWorks, LaserCut, algunos importadores de AI) la
+ * ignoran: sin el vertice de cierre falta el ultimo lado (p. ej. un lado del
+ * marco de la probeta).
+ */
+export function closedPoints(points: readonly Vec2[], closed: boolean): readonly Vec2[] {
+  if (!closed || points.length < 2) return points
+  const a = points[0]
+  const b = points[points.length - 1]
+  return Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6 ? points : [...points, a]
+}
+
 /** `d` de un path SVG. El plano XZ se mapea directo a SVG (x -> x, z -> y). */
 export function pathData(path: CutPath): string {
   if (path.points.length === 0) return ''
-  const [first, ...rest] = path.points
+  const [first, ...rest] = closedPoints(path.points, path.closed)
   return (
     `M${fmt(first[0])} ${fmt(first[1])}` +
     rest.map(([x, z]) => `L${fmt(x)} ${fmt(z)}`).join('') +
@@ -94,7 +108,7 @@ ${frames.map((f) => `    <path d="${pathData({ layer: 'contorno', points: [...f]
 <svg xmlns="http://www.w3.org/2000/svg" width="${fmt(w)}mm" height="${fmt(h)}mm" viewBox="${fmt(x0)} ${fmt(y0)} ${fmt(w)} ${fmt(h)}">
   <title>${escapeXml(title)}</title>
   <desc>Unidades: mm. Kerf ya compensado. Orden: ${labels.length ? 'grabado, ' : ''}calado, corte, contorno.${frames.length ? ' El grupo "cama" es solo referencia: no cortar.' : ''}</desc>
-${frame}${engrave}  <g fill="none" stroke-width="0.1" stroke-linejoin="round" stroke-linecap="round">
+${frame}${engrave}  <g fill="none" stroke-width="0.1" stroke-linejoin="miter" stroke-linecap="butt">
 ${groups}
   </g>
 </svg>
@@ -133,7 +147,7 @@ export function laserToDxf(
     g(20, 0)
     g(30, 0)
     g(70, closed ? 1 : 0)
-    for (const [x, z] of points) {
+    for (const [x, z] of closedPoints(points, closed)) {
       g(0, 'VERTEX')
       g(8, name)
       g(10, fmt(x))
@@ -249,7 +263,9 @@ export function laserToAi(
   const py = (z: number) => fmt((z1 - z) * PT_PER_MM)
   const lines: string[] = []
   const path = (points: readonly Vec2[], closed: boolean) => {
-    points.forEach(([x, z], k) => lines.push(`${px(x)} ${py(z)} ${k ? 'L' : 'm'}`))
+    closedPoints(points, closed).forEach(([x, z], k) =>
+      lines.push(`${px(x)} ${py(z)} ${k ? 'L' : 'm'}`),
+    )
     lines.push(closed ? 's' : 'S')
   }
 
@@ -268,8 +284,9 @@ export function laserToAi(
     '%%EndProlog',
     '%%BeginSetup',
     '%%EndSetup',
-    // planitud, extremos y uniones redondeados, trazo fino (0.1 mm), sin guiones
-    `0 i 1 J 1 j ${fmt(0.1 * PT_PER_MM)} w 4 M []0 d`,
+    // planitud, extremos rectos y uniones en inglete (un extremo redondeado se
+    // ve como un semicirculo), trazo fino (0.1 mm), sin guiones
+    `0 i 0 J 0 j ${fmt(0.1 * PT_PER_MM)} w 4 M []0 d`,
   )
   // grabado primero, con la pieza todavia fija.
   if (labels.length) {
