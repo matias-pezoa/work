@@ -100,7 +100,7 @@ src/
                   #   BaseShapeImporter/BaseShapeGround (base personalizada)
                   #   compartidos entre ambos modos 3D, ParamSlider
   scene/          # Viewport (canvas R3F, luces, grid, OrbitControls)
-  io/             # exportSTL, importSvg (SVG -> contorno)
+  io/             # exportSTL, importBase (SVG/DXF/PDF -> contorno)
   state/          # store de zustand
   utils/          # units, params, random
 ```
@@ -401,6 +401,26 @@ atractores/campo de ninguno de los dos modos.
   instalado (`playwright-core` como devDependency temporal, desinstalada
   despues — no forma parte del toolchain del proyecto). Si se vuelve a tocar
   este archivo, repetir esa verificacion manual en un navegador real.
+- `io/importBase.ts`: `importBaseFile(file)` elige importador por extension
+  (SVG, DXF, PDF) — es lo que usa `BaseShapeImporter`. Lo comun vive en
+  `io/importBoundary.ts` (puro, testeado): `closedLoops` une tramos abiertos
+  por sus extremos (LINE + ARC sueltos de CAD), `loopsToBoundary` = mayor area
+  como borde externo + agujeros (dentro de su caja Y de su poligono).
+  `ImportedBoundary.widthMm` = ancho real si el archivo trae unidades; el
+  panel lo usa como ancho inicial (el SVG no lo trae: queda 200 mm).
+- `io/importDxf.ts`: lector DXF ASCII propio, sin dependencias:
+  LWPOLYLINE/POLYLINE (bulge), LINE, ARC, CIRCLE, ELLIPSE, SPLINE (NURBS por
+  de Boor), INSERT de bloques (piezas AAMA/ASTM) con escala/rotacion, OCS con
+  extrusion -Z (espejado), `$INSUNITS` para el ancho real. Ignora espacio
+  papel (67 = 1), mallas 3D, texto. DXF binario -> error explicito.
+- `io/importPdf.ts`: pdf.js (`pdfjs-dist`, version exacta) importado
+  dinamicamente — chunk aparte + worker, no pesa en el arranque. Lee la
+  pagina 1: `pdfOperatorPolylines` (puro, testeado con OPS simulados) recorre
+  `constructPath` (datos `DrawOPS` de pdf.js >= 5) con la matriz vigente
+  (cm, q/Q, XObject de formulario); ignora recortes (`W n`), texto e
+  imagenes; un relleno cuenta como cerrado. Si se actualiza pdf.js, revisar
+  que `constructPath` siga entregando `[op, [Float32Array DrawOPS], minMax]`
+  (se verifico con `pdfjs-dist/legacy/build/pdf.mjs` en node).
 - `state/store.ts`: `baseShape: BaseShapeState | null` (outer/holes en mm, YA
   centrados/escalados, compartido — no hay uno por modo) + `setBaseShape`
   (recibe el `ImportedBoundary` crudo y lo ajusta con `fitBoundaryToWidth`),

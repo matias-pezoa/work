@@ -11,15 +11,13 @@
  * El contorno con mayor area se toma como borde externo; el resto (si caen
  * dentro de ese borde) se tratan como agujeros (p. ej. pinzas).
  */
-import { polygonArea, polygonBounds, type Vec2 } from '../geometry/polygon'
+import { polygonBounds, type Vec2 } from '../geometry/polygon'
+import { loopsToBoundary, type ImportedBoundary } from './importBoundary'
+
+export type { ImportedBoundary } from './importBoundary'
 
 const SAMPLES_PER_SHAPE = 160
 const SHAPE_SELECTOR = 'path, polygon, polyline, rect, circle, ellipse'
-
-export interface ImportedBoundary {
-  outer: Vec2[]
-  holes: Vec2[][]
-}
 
 /** Lee un archivo .svg y devuelve su contorno (en las unidades del propio SVG). */
 export async function importSvgFile(file: File): Promise<ImportedBoundary> {
@@ -157,20 +155,8 @@ export function parseSvgToBoundary(svgText: string): ImportedBoundary {
       if (loop && loop.length >= 3) loops.push(loop)
     }
 
-    if (loops.length === 0) {
-      throw new Error(
-        'No se encontraron formas cerradas (path/polygon/rect/circle/...) en el SVG.',
-      )
-    }
-
-    // el de mayor area es el borde externo; el resto (si caen dentro de su
-    // caja) son agujeros.
-    loops.sort((a, b) => polygonArea(b) - polygonArea(a))
-    const outer = loops[0]
-    const outerBounds = polygonBounds(outer)
-    const holes = loops.slice(1).filter((h) => isRoughlyInside(h, outerBounds))
-
-    return { outer: flipY(outer), holes: holes.map(flipY) }
+    // el de mayor area es el borde externo; el resto (si caen dentro) son agujeros.
+    return loopsToBoundary(loops.map(flipY), 'SVG')
   })
 }
 
@@ -199,19 +185,6 @@ function sampleShape(el: SVGGeometryElement, includeEnd = false): Vec2[] | null 
     points.push([transformed.x, transformed.y])
   }
   return points
-}
-
-function isRoughlyInside(
-  points: readonly Vec2[],
-  outerBounds: { minX: number; maxX: number; minZ: number; maxZ: number },
-): boolean {
-  const b = polygonBounds(points)
-  return (
-    b.minX >= outerBounds.minX - 1e-6 &&
-    b.maxX <= outerBounds.maxX + 1e-6 &&
-    b.minZ >= outerBounds.minZ - 1e-6 &&
-    b.maxZ <= outerBounds.maxZ + 1e-6
-  )
 }
 
 /** SVG crece en Y hacia abajo; se invierte para que "arriba en el papel" sea +Z. */
