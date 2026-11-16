@@ -6,7 +6,13 @@
  *
  * Funciones puras: sin DOM, testeables en node.
  */
-import { pointInPolygon, polygonArea, polygonBounds, type Vec2 } from '../geometry/polygon'
+import {
+  distanceToPolygonEdges,
+  pointInPolygon,
+  polygonArea,
+  polygonBounds,
+  type Vec2,
+} from '../geometry/polygon'
 
 /**
  * Una pieza, en las unidades del archivo y con Y hacia ABAJO como el SVG: el
@@ -111,9 +117,24 @@ function insideOf(inner: readonly Vec2[], outer: readonly Vec2[]): boolean {
 }
 
 /**
+ * `inner` (ya dentro de `outer`) es la linea de costura de la pieza y no un
+ * agujero: ocupa al menos la mitad del area y corre paralela al borde (ningun
+ * vertice se aleja del borde mas de 1/4 del lado menor de la pieza). Los
+ * moldes de patronaje traen linea de corte + linea de costura; tomar la de
+ * costura como agujero dejaba la pieza sin lugar para los calados.
+ */
+export function isSeamLine(inner: readonly Vec2[], outer: readonly Vec2[]): boolean {
+  if (polygonArea(inner) < 0.5 * polygonArea(outer)) return false
+  const b = polygonBounds(outer)
+  const reach = 0.25 * Math.min(b.maxX - b.minX, b.maxZ - b.minZ)
+  return inner.every(([x, z]) => distanceToPolygonEdges(x, z, outer) <= reach)
+}
+
+/**
  * Separa los lazos en piezas: cada lazo que no cae dentro de otra pieza es
  * una pieza nueva; uno que cae dentro de una pieza es su agujero (p. ej. una
- * pinza); uno dentro de un agujero (una isla) vuelve a ser pieza propia.
+ * pinza), salvo que sea su linea de costura (`isSeamLine`, se descarta); uno
+ * dentro de un agujero (una isla) vuelve a ser pieza propia.
  * Las piezas salen de mayor a menor area.
  */
 export function loopsToPieces(loops: readonly Vec2[][], what: string): ImportedBoundary[] {
@@ -129,8 +150,9 @@ export function loopsToPieces(loops: readonly Vec2[][], what: string): ImportedB
     let owner: ImportedBoundary | undefined
     for (let k = pieces.length - 1; k >= 0 && !owner; k--)
       if (insideOf(loop, pieces[k].outer)) owner = pieces[k]
-    if (owner && !owner.holes.some((h) => insideOf(loop, h))) owner.holes.push(loop)
-    else pieces.push({ outer: loop, holes: [] })
+    if (owner && !owner.holes.some((h) => insideOf(loop, h))) {
+      if (!isSeamLine(loop, owner.outer)) owner.holes.push(loop)
+    } else pieces.push({ outer: loop, holes: [] })
   }
   return pieces
 }

@@ -184,7 +184,7 @@ describe('varias piezas en un archivo', () => {
   })
 
   it('una isla dentro de un agujero vuelve a ser pieza', () => {
-    const pieces = loopsToPieces([sq(0, 0, 100), sq(10, 10, 80), sq(20, 20, 20)], 'test')
+    const pieces = loopsToPieces([sq(0, 0, 100), sq(30, 30, 40), sq(40, 40, 20)], 'test')
     expect(pieces).toHaveLength(2)
     expect(pieces[0].holes).toHaveLength(1)
     expect(polygonArea(pieces[1].outer)).toBe(400)
@@ -208,5 +208,31 @@ describe('orientacion', () => {
     const { pieces } = parseDxfToShapes(dxf([tri]))
     const tip = pieces[0].outer.find(([x]) => Math.abs(x - 50) < 1e-9)!
     expect(tip[1]).toBe(Math.min(...pieces[0].outer.map((p) => p[1])))
+  })
+})
+
+describe('linea de costura', () => {
+  const rectLoop = (x: number, y: number, w: number, h: number): [number, number][] => [
+    [x, y],
+    [x + w, y],
+    [x + w, y + h],
+    [x, y + h],
+  ]
+
+  it('un contorno paralelo dentro de la pieza (corte + costura) no es agujero', () => {
+    const pieces = loopsToPieces([rectLoop(0, 0, 200, 1000), rectLoop(10, 10, 180, 980)], 'test')
+    expect(pieces).toHaveLength(1)
+    expect(pieces[0].holes).toHaveLength(0)
+    expect(polygonArea(pieces[0].outer)).toBe(200000) // queda la linea de corte
+  })
+
+  it('una pinza o un agujero chico sigue siendo agujero', () => {
+    const pieces = loopsToPieces([rectLoop(0, 0, 200, 1000), rectLoop(80, 300, 40, 200)], 'test')
+    expect(pieces[0].holes).toHaveLength(1)
+  })
+
+  it('pieza angosta (pretina) con costura', () => {
+    const pieces = loopsToPieces([rectLoop(0, 0, 720, 70), rectLoop(10, 10, 700, 50)], 'test')
+    expect(pieces[0].holes).toHaveLength(0)
   })
 })

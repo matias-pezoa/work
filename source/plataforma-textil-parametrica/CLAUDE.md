@@ -413,6 +413,13 @@ atractores/campo de ninguno de los dos modos.
   (`pieceIndex`); `selectBasePiece` cambia de pieza CONSERVANDO los mm por
   unidad, para que las piezas de un patron mantengan su proporcion. El panel
   (`PiecePicker` en BaseShapeImporter) muestra miniaturas si hay mas de una.
+  LINEA DE COSTURA: los moldes reales traen linea de corte + linea de
+  costura paralela adentro. `isSeamLine` (area >= 50% de la pieza y ningun
+  vertice a mas de 1/4 del lado menor del borde) la DESCARTA en vez de
+  tomarla como agujero — si no, el agujero tapaba la pieza y casi no habia
+  calados (molde Molly: 24 -> 496). Pinzas y piquetes siguen como agujeros.
+  Caso ambiguo conocido: una pieza tipo anillo con agujero grande y cercano
+  al borde se leeria como costura.
   ORIENTACION: las piezas importadas tienen Y hacia ABAJO como el SVG (el SVG
   no se invierte; DXF/PDF se invierten con `flipLoopsY`), porque en el plano
   de la app +z es abajo en la vista laser y en el export, y hacia la camara
