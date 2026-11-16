@@ -58,9 +58,11 @@ import {
 import {
   downloadBedAi,
   downloadBedDxf,
+  downloadBedPdf,
   downloadBedSvg,
   downloadLaserAi,
   downloadLaserDxf,
+  downloadLaserPdf,
   downloadLaserSvg,
   downloadSwatchSvg,
 } from '../io/exportLaser'
@@ -589,6 +591,14 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               >
                 AI
               </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={!bed || !canExport}
+                onClick={() => bed && downloadBedPdf(bed, filename)}
+              >
+                PDF
+              </button>
             </div>
           </>
         ) : (
@@ -617,11 +627,20 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
             >
               AI
             </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={!canExport}
+              onClick={() => downloadLaserPdf(result, filename, pad)}
+            >
+              PDF
+            </button>
           </div>
         )}
         <p className="hint">
-          AI = Illustrator 3, el formato que leen RDWorks y LightBurn. Colores: calados
-          azul, cortes verde, contorno rojo (se corta al final).
+          AI = Illustrator 3, el formato que leen RDWorks y LightBurn. PDF vectorial a
+          escala real, con una capa por tipo de corte. Colores: calados azul, cortes
+          verde, contorno rojo (se corta al final).
         </p>
         <details className="more nested">
           <summary>Detalle tecnico</summary>

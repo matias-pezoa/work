@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { buildLaserCut, DEFAULT_LASER } from '../../geometry/laserCut'
 import { createAttractor } from '../../geometry/attractionField'
-import { closedPoints, laserToAi, laserToDxf, laserToSvg, pathData } from '../exportLaser'
+import { closedPoints, laserToAi, laserToDxf, laserToPdf, laserToSvg, pathData } from '../exportLaser'
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { pdfOperatorPolylines } from '../importPdf'
 
 const result = buildLaserCut(
   [createAttractor(new THREE.Vector3(0, 0, 0), { radius: 10, falloff: 'linear' })],
@@ -123,4 +125,35 @@ describe('calados cerrados en todas las familias', () => {
       expect(paths.length).toBeGreaterThan(0)
     })
   }
+})
+
+describe('laserToPdf', () => {
+  const r = buildLaserCut(
+    [createAttractor(new THREE.Vector3(0, 0, 0), { radius: 40, falloff: 'linear' })],
+    { ...DEFAULT_LASER, family: 'perforation' },
+  )
+  const pdf = laserToPdf(r, 'probeta (01)', [{ x: 0, z: 0, sizeMm: 5, text: 'AB' }], 0)
+
+  it('xref exacta: cada desplazamiento apunta al inicio de su objeto', () => {
+    const start = Number(pdf.match(/startxref\n(\d+)/)![1])
+    expect(pdf.slice(start, start + 4)).toBe('xref')
+    const offsets = [...pdf.slice(start).matchAll(/^(\d{10}) 00000 n $/gm)].map((m) => Number(m[1]))
+    offsets.forEach((o, k) => expect(pdf.slice(o, o + `${k + 1} 0 obj`.length)).toBe(`${k + 1} 0 obj`))
+  })
+
+  it('pdf.js lo lee: pagina a escala real, capas y trazos cerrados', async () => {
+    const task = pdfjs.getDocument({ data: new TextEncoder().encode(pdf) })
+    const doc = await task.promise
+    const page = await doc.getPage(1)
+    const { minX, maxX, minZ, maxZ } = r.bounds
+    expect(page.view[2]).toBeCloseTo(((maxX - minX) * 72) / 25.4, 2)
+    expect(page.view[3]).toBeCloseTo(((maxZ - minZ) * 72) / 25.4, 2)
+    const oc = await doc.getOptionalContentConfig()
+    const names = [...oc].map(([, g]) => g.name)
+    expect(names).toEqual(['GRABADO', 'CALADO', 'CONTORNO'])
+    const list = await page.getOperatorList()
+    const polys = pdfOperatorPolylines(list.fnArray, list.argsArray, pdfjs.OPS)
+    expect(polys.filter((p) => p.closed)).toHaveLength(r.paths.filter((p) => p.closed).length)
+    await task.destroy()
+  })
 })

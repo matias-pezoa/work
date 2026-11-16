@@ -305,6 +305,82 @@ export function laserToAi(
   return lines.join('\n') + '\n'
 }
 
+/**
+ * PDF 1.5 vectorial (sin comprimir, texto plano): una capa (OCG) por tipo de
+ * corte, que Illustrator, Inkscape y LightBurn muestran como capas, en
+ * LAYER_ORDER, con el color de trazo de LAYER_COLORS. Un `S` por trazo para
+ * que cada corte llegue como objeto propio. Rotulos como trazos negros
+ * (strokeFont.ts) en la capa GRABADO. Como en el .ai, el marco de la cama no
+ * se incluye. Pagina = pieza + `padMm`, en puntos (1 mm = 72/25.4 pt).
+ */
+export function laserToPdf(
+  result: Pick<LaserCutResult, 'paths' | 'bounds'>,
+  title = 'Corte laser',
+  labels: readonly TextLabel[] = [],
+  padMm = SVG_PAD_MM,
+): string {
+  const { minX, maxX, minZ, maxZ } = result.bounds
+  const x0 = minX - padMm
+  const z1 = maxZ + padMm
+  const wPt = (maxX - minX + 2 * padMm) * PT_PER_MM
+  const hPt = (maxZ - minZ + 2 * padMm) * PT_PER_MM
+  const px = (x: number) => fmt((x - x0) * PT_PER_MM)
+  const py = (z: number) => fmt((z1 - z) * PT_PER_MM)
+  const rgb = (hex: string) =>
+    [1, 3, 5].map((k) => fmt(Number.parseInt(hex.slice(k, k + 2), 16) / 255)).join(' ')
+
+  const groups: { name: string; color: string; strokes: { points: readonly Vec2[]; closed: boolean }[] }[] = []
+  if (labels.length) {
+    groups.push({
+      name: 'GRABADO',
+      color: '#000000',
+      strokes: labels.flatMap((l) => textToStrokes(l).map((points) => ({ points, closed: false }))),
+    })
+  }
+  for (const layer of LAYER_ORDER) {
+    const paths = result.paths.filter((p) => p.layer === layer && p.points.length >= 2)
+    if (paths.length) groups.push({ ...LAYER_COLORS[layer], color: LAYER_COLORS[layer].hex, strokes: paths })
+  }
+
+  const content: string[] = [`${fmt(0.1 * PT_PER_MM)} w 0 J 0 j`]
+  groups.forEach((g, k) => {
+    content.push(`/OC /L${k} BDC`, `${rgb(g.color)} RG`)
+    for (const s of g.strokes) {
+      const pts = closedPoints(s.points, s.closed)
+      content.push(
+        pts.map(([x, z], i) => `${px(x)} ${py(z)} ${i ? 'l' : 'm'}`).join(' ') +
+          (s.closed ? ' h S' : ' S'),
+      )
+    }
+    content.push('EMC')
+  })
+  const stream = content.join('\n') + '\n'
+
+  // objetos: 1 catalogo, 2 paginas, 3 pagina, 4 contenido, 5 info, 6.. capas
+  const ocg = (k: number) => `${6 + k} 0 R`
+  const refs = groups.map((_, k) => ocg(k)).join(' ')
+  const objects = [
+    `<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [${refs}] /D << /Order [${refs}] /ON [${refs}] >> >> >>`,
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${fmt(wPt)} ${fmt(hPt)}] /Contents 4 0 R /Resources << /Properties << ${groups.map((_, k) => `/L${k} ${ocg(k)}`).join(' ')} >> >> >>`,
+    `<< /Length ${stream.length} >>\nstream\n${stream}endstream`,
+    `<< /Title (${psString(title)}) /Creator (Plataforma parametrica textil) >>`,
+    ...groups.map((g) => `<< /Type /OCG /Name (${psString(g.name)}) >>`),
+  ]
+  let pdf = '%PDF-1.5\n'
+  const offsets: number[] = []
+  objects.forEach((o, k) => {
+    offsets.push(pdf.length)
+    pdf += `${k + 1} 0 obj\n${o}\nendobj\n`
+  })
+  const xref = pdf.length
+  pdf +=
+    `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` +
+    offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('') +
+    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R /Info 5 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return pdf
+}
+
 function psString(s: string): string {
   return s.replace(/[()\\]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, '?')
 }
@@ -320,6 +396,25 @@ export function downloadLaserAi(
       type: 'application/postscript',
     }),
     `${filename}.ai`,
+  )
+}
+
+/** `padMm` = 0: el archivo mide exactamente la pieza (probeta de 200 x 200). */
+export function downloadLaserPdf(
+  result: LaserCutResult,
+  filename = 'corte-laser',
+  padMm = SVG_PAD_MM,
+): void {
+  triggerDownload(
+    new Blob([laserToPdf(result, filename, [], padMm)], { type: 'application/pdf' }),
+    `${filename}.pdf`,
+  )
+}
+
+export function downloadBedPdf(bed: BedLayout, filename = 'cama-laser'): void {
+  triggerDownload(
+    new Blob([laserToPdf(bed, filename, bed.labels)], { type: 'application/pdf' }),
+    `${filename}.pdf`,
   )
 }
 

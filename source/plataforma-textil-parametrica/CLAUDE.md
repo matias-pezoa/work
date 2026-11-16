@@ -264,6 +264,12 @@ src/
   archivo mide exactamente `bounds` (`downloadLaserSvg/Ai(..., padMm)`).
   El .ai no se verifico abriendolo en Illustrator/LightBurn: hacerlo con el
   primer archivo real.
+- `laserToPdf` (mismo archivo): PDF 1.5 escrito a mano, sin comprimir (ASCII:
+  longitud de string = bytes, la xref sale exacta), una capa OCG por tipo de
+  corte (GRABADO, CALADO, CORTE, CONTORNO) con color RGB de LAYER_COLORS, un
+  `S` por trazo, cerrados con vertice de cierre + `h`. Sin marco de cama,
+  como el .ai. Test de ida y vuelta con pdf.js (`exportLaser.test.ts`):
+  xref, tamano de pagina, capas y trazos cerrados.
 - Tests: `laserImage.test.ts`, `laserSpecimens.test.ts` (probeta, nombre, AI,
   tipografia).
 
