@@ -19,8 +19,13 @@ import {
   type LaserNumericKey,
   type LaserParams,
 } from '../geometry/laserCut'
-import { fitBoundaryToWidth, rescaleBoundary, type Vec2 } from '../geometry/polygon'
-import type { ImportedBoundary } from '../io/importSvg'
+import {
+  fitBoundaryToWidth,
+  polygonBounds,
+  rescaleBoundary,
+  type Vec2,
+} from '../geometry/polygon'
+import type { ImportedBoundary, ImportedShapes } from '../io/importBoundary'
 import type { ImportedImage } from '../io/importImage'
 import {
   applyAttractorPatch,
@@ -43,7 +48,8 @@ export type WaveNumericKey = Exclude<keyof WaveFieldParams, 'combine' | 'curveRi
 
 /**
  * Base personalizada importada (p. ej. una pieza de patron), compartida entre
- * los modos 3D. `outer`/`holes` ya estan centrados en el origen y en mm.
+ * los modos 3D. `outer`/`holes` (la pieza activa) ya estan centrados en el
+ * origen y en mm.
  */
 export interface BaseShapeState {
   outer: Vec2[]
@@ -51,6 +57,35 @@ export interface BaseShapeState {
   widthMm: number
   heightMm: number
   fileName: string
+  /** Todas las piezas del archivo, crudas (unidades del archivo, mayor area primero). */
+  pieces: ImportedBoundary[]
+  /** Pieza activa dentro de `pieces`. */
+  pieceIndex: number
+}
+
+/** Ancho de una pieza cruda, en unidades del archivo. */
+function rawPieceWidth(piece: ImportedBoundary): number {
+  const b = polygonBounds(piece.outer)
+  return Math.max(b.maxX - b.minX, 1e-6)
+}
+
+function fitPiece(
+  pieces: ImportedBoundary[],
+  pieceIndex: number,
+  widthMm: number,
+  fileName: string,
+): BaseShapeState {
+  const piece = pieces[pieceIndex]
+  const fitted = fitBoundaryToWidth(piece.outer, piece.holes, widthMm)
+  return {
+    outer: fitted.outer,
+    holes: fitted.holes,
+    widthMm: fitted.widthMm,
+    heightMm: fitted.heightMm,
+    fileName,
+    pieces,
+    pieceIndex,
+  }
 }
 
 export interface AppState {
@@ -133,7 +168,13 @@ export interface AppState {
   removeLaserAttractor: (id: string) => void
   selectLaserAttractor: (id: string | null, pointIndex?: number | null) => void
 
-  setBaseShape: (imported: ImportedBoundary, widthMm: number, fileName: string) => void
+  /**
+   * Carga las piezas de un archivo y activa la primera (la de mayor area), a
+   * su medida real si el archivo trae unidades; si no, a `fallbackWidthMm`.
+   */
+  setBaseShape: (imported: ImportedShapes, fallbackWidthMm: number, fileName: string) => void
+  /** Cambia la pieza activa manteniendo la escala: las piezas conservan su proporcion entre si. */
+  selectBasePiece: (index: number) => void
   setBaseShapeWidthMm: (widthMm: number) => void
   clearBaseShape: () => void
 
@@ -436,18 +477,27 @@ export const useAppStore = create<AppState>((set) => ({
       selectedPointIndex: selectedLaserAttractorId ? pointIndex : null,
     }),
 
-  setBaseShape: (imported, widthMm, fileName) => {
-    const fitted = fitBoundaryToWidth(imported.outer, imported.holes, widthMm)
-    set({
-      baseShape: {
-        outer: fitted.outer,
-        holes: fitted.holes,
-        widthMm: fitted.widthMm,
-        heightMm: fitted.heightMm,
-        fileName,
-      },
-    })
+  setBaseShape: (imported, fallbackWidthMm, fileName) => {
+    const { pieces, mmPerUnit } = imported
+    if (pieces.length === 0) return
+    const widthMm = mmPerUnit ? rawPieceWidth(pieces[0]) * mmPerUnit : fallbackWidthMm
+    set({ baseShape: fitPiece(pieces, 0, widthMm, fileName) })
   },
+
+  selectBasePiece: (index) =>
+    set((s) => {
+      const b = s.baseShape
+      if (!b || index === b.pieceIndex || !b.pieces[index]) return s
+      const mmPerUnit = b.widthMm / rawPieceWidth(b.pieces[b.pieceIndex])
+      return {
+        baseShape: fitPiece(
+          b.pieces,
+          index,
+          rawPieceWidth(b.pieces[index]) * mmPerUnit,
+          b.fileName,
+        ),
+      }
+    }),
 
   setBaseShapeWidthMm: (widthMm) =>
     set((s) => {

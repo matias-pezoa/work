@@ -8,21 +8,21 @@
  * `<ellipse>`) como una polilinea, y en `getCTM()` para resolver transforms
  * anidados (`<g transform="...">`) sin parsearlos manualmente.
  *
- * El contorno con mayor area se toma como borde externo; el resto (si caen
- * dentro de ese borde) se tratan como agujeros (p. ej. pinzas).
+ * Cada contorno que no cae dentro de otro es una pieza; los que caen dentro
+ * de una pieza son sus agujeros (p. ej. pinzas). Ver `loopsToPieces`.
  */
 import { polygonBounds, type Vec2 } from '../geometry/polygon'
-import { loopsToBoundary, type ImportedBoundary } from './importBoundary'
+import { loopsToPieces, type ImportedShapes } from './importBoundary'
 
-export type { ImportedBoundary } from './importBoundary'
+export type { ImportedBoundary, ImportedShapes } from './importBoundary'
 
 const SAMPLES_PER_SHAPE = 160
 const SHAPE_SELECTOR = 'path, polygon, polyline, rect, circle, ellipse'
 
 /** Lee un archivo .svg y devuelve su contorno (en las unidades del propio SVG). */
-export async function importSvgFile(file: File): Promise<ImportedBoundary> {
+export async function importSvgFile(file: File): Promise<ImportedShapes> {
   const text = await file.text()
-  return parseSvgToBoundary(text)
+  return parseSvgToShapes(text)
 }
 
 /**
@@ -147,7 +147,7 @@ function simplify(points: readonly Vec2[], eps: number): Vec2[] {
 }
 
 /** Version testeable: recibe el texto del SVG directamente. */
-export function parseSvgToBoundary(svgText: string): ImportedBoundary {
+export function parseSvgToShapes(svgText: string): ImportedShapes {
   return withMountedShapes(svgText, (shapes) => {
     const loops: Vec2[][] = []
     for (const shape of shapes) {
@@ -155,8 +155,8 @@ export function parseSvgToBoundary(svgText: string): ImportedBoundary {
       if (loop && loop.length >= 3) loops.push(loop)
     }
 
-    // el de mayor area es el borde externo; el resto (si caen dentro) son agujeros.
-    return loopsToBoundary(loops.map(flipY), 'SVG')
+    // cada contorno suelto es una pieza; los que caen dentro de una, sus agujeros.
+    return { pieces: loopsToPieces(loops.map(flipY), 'SVG') }
   })
 }
 

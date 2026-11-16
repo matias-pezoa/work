@@ -404,10 +404,15 @@ atractores/campo de ninguno de los dos modos.
 - `io/importBase.ts`: `importBaseFile(file)` elige importador por extension
   (SVG, DXF, PDF) — es lo que usa `BaseShapeImporter`. Lo comun vive en
   `io/importBoundary.ts` (puro, testeado): `closedLoops` une tramos abiertos
-  por sus extremos (LINE + ARC sueltos de CAD), `loopsToBoundary` = mayor area
-  como borde externo + agujeros (dentro de su caja Y de su poligono).
-  `ImportedBoundary.widthMm` = ancho real si el archivo trae unidades; el
-  panel lo usa como ancho inicial (el SVG no lo trae: queda 200 mm).
+  por sus extremos (LINE + ARC sueltos de CAD), `loopsToPieces` separa un
+  archivo en VARIAS piezas (cada lazo fuera de otro = pieza; dentro de una
+  pieza = agujero; dentro de un agujero = isla = pieza propia), de mayor a
+  menor area. `ImportedShapes.mmPerUnit` = escala real si el archivo trae
+  unidades (el SVG no: la primera pieza entra a 200 mm o al ancho actual).
+  El store guarda todas las piezas crudas (`baseShape.pieces`) y la activa
+  (`pieceIndex`); `selectBasePiece` cambia de pieza CONSERVANDO los mm por
+  unidad, para que las piezas de un patron mantengan su proporcion. El panel
+  (`PiecePicker` en BaseShapeImporter) muestra miniaturas si hay mas de una.
 - `io/importDxf.ts`: lector DXF ASCII propio, sin dependencias:
   LWPOLYLINE/POLYLINE (bulge), LINE, ARC, CIRCLE, ELLIPSE, SPLINE (NURBS por
   de Boor), INSERT de bloques (piezas AAMA/ASTM) con escala/rotacion, OCS con

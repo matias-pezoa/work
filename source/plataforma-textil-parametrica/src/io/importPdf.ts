@@ -16,10 +16,9 @@ import type { Vec2 } from '../geometry/polygon'
 import {
   closedLoops,
   joinTolerance,
-  loopsToBoundary,
-  widthInMm,
-  type ImportedBoundary,
+  loopsToPieces,
   type ImportedPolyline,
+  type ImportedShapes,
 } from './importBoundary'
 
 /** mm por punto PDF. */
@@ -27,7 +26,7 @@ const MM_PER_PT = 25.4 / 72
 /** Muestras por curva Bezier. */
 const CURVE_SAMPLES = 16
 
-export async function importPdfFile(file: File): Promise<ImportedBoundary> {
+export async function importPdfFile(file: File): Promise<ImportedShapes> {
   const [pdfjs, worker] = await Promise.all([
     import('pdfjs-dist'),
     import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
@@ -45,8 +44,8 @@ export async function importPdfFile(file: File): Promise<ImportedBoundary> {
     const page = await doc.getPage(1)
     const list = await page.getOperatorList()
     const polylines = pdfOperatorPolylines(list.fnArray, list.argsArray, pdfjs.OPS)
-    const boundary = loopsToBoundary(closedLoops(polylines, joinTolerance(polylines)), 'PDF')
-    return { ...boundary, widthMm: widthInMm(boundary.outer, MM_PER_PT) }
+    const pieces = loopsToPieces(closedLoops(polylines, joinTolerance(polylines)), 'PDF')
+    return { pieces, mmPerUnit: MM_PER_PT }
   } finally {
     // destruir la tarea libera el documento y el worker.
     await task.destroy()

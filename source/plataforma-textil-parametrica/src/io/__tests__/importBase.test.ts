@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { polygonArea, polygonBounds } from '../../geometry/polygon'
-import { closedLoops } from '../importBoundary'
-import { bulgePolyline, parseDxfToBoundary } from '../importDxf'
+import { closedLoops, loopsToPieces } from '../importBoundary'
+import { bulgePolyline, parseDxfToShapes } from '../importDxf'
 import { pdfOperatorPolylines, type PdfOps } from '../importPdf'
 
 /** Arma un DXF ASCII con las entidades dadas (pares codigo/valor). */
@@ -21,6 +21,13 @@ const circle = (x: number, y: number, r: number) => [0, 'CIRCLE', 8, '0', 10, x,
 const line = (x1: number, y1: number, x2: number, y2: number) => [
   0, 'LINE', 8, '0', 10, x1, 20, y1, 11, x2, 21, y2,
 ]
+
+/** Primera pieza del DXF + su ancho real en mm (si el archivo trae unidades). */
+function parseDxfToBoundary(text: string) {
+  const { pieces, mmPerUnit } = parseDxfToShapes(text)
+  const b = polygonBounds(pieces[0].outer)
+  return { ...pieces[0], widthMm: mmPerUnit ? (b.maxX - b.minX) * mmPerUnit : undefined }
+}
 
 describe('DXF', () => {
   it('rectangulo con un circulo adentro: externo + agujero, ancho real en mm', () => {
@@ -156,5 +163,40 @@ describe('PDF (lista de operaciones de pdf.js)', () => {
     const [p] = pdfOperatorPolylines([OPS.constructPath], [[OPS.stroke, [data], null]], OPS)
     expect(p.closed).toBe(true)
     expect(polygonArea(p.points)).toBeCloseTo(Math.PI * 100, -1)
+  })
+})
+
+describe('varias piezas en un archivo', () => {
+  const sq = (x: number, y: number, s: number): [number, number][] => [
+    [x, y],
+    [x + s, y],
+    [x + s, y + s],
+    [x, y + s],
+  ]
+
+  it('cada contorno suelto es una pieza, con sus propios agujeros, de mayor a menor', () => {
+    const pieces = loopsToPieces(
+      [sq(0, 0, 10), sq(100, 0, 50), sq(110, 10, 10), sq(2, 2, 3), sq(300, 0, 20)],
+      'test',
+    )
+    expect(pieces.map((p) => polygonArea(p.outer))).toEqual([2500, 400, 100])
+    expect(pieces.map((p) => p.holes.length)).toEqual([1, 0, 1])
+  })
+
+  it('una isla dentro de un agujero vuelve a ser pieza', () => {
+    const pieces = loopsToPieces([sq(0, 0, 100), sq(10, 10, 80), sq(20, 20, 20)], 'test')
+    expect(pieces).toHaveLength(2)
+    expect(pieces[0].holes).toHaveLength(1)
+    expect(polygonArea(pieces[1].outer)).toBe(400)
+  })
+
+  it('DXF con dos piezas en bloques distintos', () => {
+    const { pieces, mmPerUnit } = parseDxfToShapes(
+      dxf([rect(100, 50), circle(50, 25, 10), rect(30, 30, 200, 0)], { units: 4 }),
+    )
+    expect(pieces).toHaveLength(2)
+    expect(pieces[0].holes).toHaveLength(1)
+    expect(pieces[1].holes).toHaveLength(0)
+    expect(mmPerUnit).toBe(1)
   })
 })

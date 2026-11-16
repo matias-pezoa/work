@@ -834,3 +834,66 @@ button.ghost {
   margin-bottom: 14px;
   color: var(--white);
 }
+
+/* base personalizada con varias piezas: miniaturas para elegir la activa */
+.piece-picker ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.piece-picker button {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 1px solid var(--line-faint);
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--gray-1);
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.15s linear,
+    color 0.15s linear;
+}
+
+.piece-picker button:hover {
+  border-color: var(--line-soft);
+  color: var(--white);
+}
+
+.piece-picker button.active {
+  border-color: var(--white);
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.piece-picker button:focus-visible {
+  outline: 1px solid var(--white);
+  outline-offset: 1px;
+}
+
+.piece-picker svg {
+  width: 100%;
+  height: 48px;
+}
+
+.piece-picker path {
+  fill: var(--line-faint);
+  stroke: var(--gray-1);
+  stroke-width: 1;
+}
+
+.piece-picker button.active path {
+  fill: var(--line-soft);
+  stroke: var(--white);
+}

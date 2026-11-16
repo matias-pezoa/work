@@ -1,20 +1,27 @@
 /**
  * Piezas comunes de los importadores de base personalizada (SVG, DXF, PDF):
  * todos terminan en una lista de trazos (polilineas abiertas o cerradas) que
- * se convierten en un contorno externo + agujeros.
+ * se convierten en piezas (contorno externo + agujeros). Un archivo puede
+ * traer varias piezas (p. ej. un patron completo); el panel deja elegir una.
  *
  * Funciones puras: sin DOM, testeables en node.
  */
 import { pointInPolygon, polygonArea, polygonBounds, type Vec2 } from '../geometry/polygon'
 
+/** Una pieza, en las unidades del archivo y con Y hacia arriba. */
 export interface ImportedBoundary {
   outer: Vec2[]
   holes: Vec2[][]
+}
+
+/** Todas las piezas de un archivo, de mayor a menor area. */
+export interface ImportedShapes {
+  pieces: ImportedBoundary[]
   /**
-   * Ancho real del contorno externo en mm, si el archivo declara unidades
-   * (DXF con $INSUNITS, PDF en puntos). El SVG no lo trae: se elige a mano.
+   * mm por unidad del archivo, si declara unidades (DXF con $INSUNITS, PDF en
+   * puntos): las piezas entran a su medida real. El SVG no lo trae.
    */
-  widthMm?: number
+  mmPerUnit?: number
 }
 
 /** Trazo leido de un archivo, en sus propias unidades y con Y hacia arriba. */
@@ -81,35 +88,40 @@ export function joinTolerance(polylines: readonly ImportedPolyline[]): number {
   return Math.max(1e-6, Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ) * 5e-4)
 }
 
+/** `inner` cae dentro de `outer` (caja + primer vertice dentro del poligono). */
+function insideOf(inner: readonly Vec2[], outer: readonly Vec2[]): boolean {
+  const ob = polygonBounds(outer)
+  const b = polygonBounds(inner)
+  return (
+    b.minX >= ob.minX - 1e-6 &&
+    b.maxX <= ob.maxX + 1e-6 &&
+    b.minZ >= ob.minZ - 1e-6 &&
+    b.maxZ <= ob.maxZ + 1e-6 &&
+    pointInPolygon(inner[0][0], inner[0][1], outer)
+  )
+}
+
 /**
- * El lazo de mayor area es el borde externo; los demas que caen dentro de el
- * son agujeros (p. ej. pinzas). Lo que queda afuera (otra pieza) se ignora.
+ * Separa los lazos en piezas: cada lazo que no cae dentro de otra pieza es
+ * una pieza nueva; uno que cae dentro de una pieza es su agujero (p. ej. una
+ * pinza); uno dentro de un agujero (una isla) vuelve a ser pieza propia.
+ * Las piezas salen de mayor a menor area.
  */
-export function loopsToBoundary(loops: readonly Vec2[][], what: string): ImportedBoundary {
+export function loopsToPieces(loops: readonly Vec2[][], what: string): ImportedBoundary[] {
   if (loops.length === 0) {
     throw new Error(
       `No se encontraron contornos cerrados en el ${what}. Revisa que la pieza este cerrada (sin tramos sueltos).`,
     )
   }
   const sorted = [...loops].sort((a, b) => polygonArea(b) - polygonArea(a))
-  const outer = sorted[0]
-  const ob = polygonBounds(outer)
-  const holes = sorted.slice(1).filter((h) => {
-    const b = polygonBounds(h)
-    return (
-      b.minX >= ob.minX - 1e-6 &&
-      b.maxX <= ob.maxX + 1e-6 &&
-      b.minZ >= ob.minZ - 1e-6 &&
-      b.maxZ <= ob.maxZ + 1e-6 &&
-      pointInPolygon(h[0][0], h[0][1], outer)
-    )
-  })
-  return { outer, holes }
-}
-
-/** Ancho del contorno externo, en mm, a partir de cuantos mm mide una unidad del archivo. */
-export function widthInMm(outer: readonly Vec2[], mmPerUnit: number | undefined): number | undefined {
-  if (!mmPerUnit) return undefined
-  const b = polygonBounds(outer)
-  return (b.maxX - b.minX) * mmPerUnit
+  const pieces: ImportedBoundary[] = []
+  for (const loop of sorted) {
+    // la pieza contenedora mas chica (las piezas van de mayor a menor area).
+    let owner: ImportedBoundary | undefined
+    for (let k = pieces.length - 1; k >= 0 && !owner; k--)
+      if (insideOf(loop, pieces[k].outer)) owner = pieces[k]
+    if (owner && !owner.holes.some((h) => insideOf(loop, h))) owner.holes.push(loop)
+    else pieces.push({ outer: loop, holes: [] })
+  }
+  return pieces
 }

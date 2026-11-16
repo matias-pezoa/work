@@ -14,10 +14,9 @@ import type { Vec2 } from '../geometry/polygon'
 import {
   closedLoops,
   joinTolerance,
-  loopsToBoundary,
-  widthInMm,
-  type ImportedBoundary,
+  loopsToPieces,
   type ImportedPolyline,
+  type ImportedShapes,
 } from './importBoundary'
 
 /** Paso angular al muestrear arcos y circulos. */
@@ -36,16 +35,16 @@ const INSUNITS_MM: Record<number, number> = {
   6: 1000, // m
 }
 
-export async function importDxfFile(file: File): Promise<ImportedBoundary> {
-  return parseDxfToBoundary(await file.text())
+export async function importDxfFile(file: File): Promise<ImportedShapes> {
+  return parseDxfToShapes(await file.text())
 }
 
-export function parseDxfToBoundary(text: string): ImportedBoundary {
+export function parseDxfToShapes(text: string): ImportedShapes {
   const dxf = parseDxf(text)
   const polylines = dxf.entities.flatMap((e) => entityPolylines(e, dxf.blocks, IDENTITY, 0))
-  const boundary = loopsToBoundary(closedLoops(polylines, joinTolerance(polylines)), 'DXF')
-  const widthMm = widthInMm(boundary.outer, dxf.insUnits ? INSUNITS_MM[dxf.insUnits] : undefined)
-  return widthMm ? { ...boundary, widthMm } : boundary
+  const pieces = loopsToPieces(closedLoops(polylines, joinTolerance(polylines)), 'DXF')
+  const mmPerUnit = dxf.insUnits ? INSUNITS_MM[dxf.insUnits] : undefined
+  return mmPerUnit ? { pieces, mmPerUnit } : { pieces }
 }
 
 // ------------------------------------------------------------ lectura
