@@ -200,3 +200,13 @@ describe('varias piezas en un archivo', () => {
     expect(mmPerUnit).toBe(1)
   })
 })
+
+describe('orientacion', () => {
+  it('DXF: lo que esta arriba en el plano queda arriba en pantalla (z menor)', () => {
+    // triangulo con la punta hacia arriba (y mayor en el DXF).
+    const tri = [0, 'LWPOLYLINE', 8, '0', 90, 3, 70, 1, 10, 0, 20, 0, 10, 100, 20, 0, 10, 50, 20, 80]
+    const { pieces } = parseDxfToShapes(dxf([tri]))
+    const tip = pieces[0].outer.find(([x]) => Math.abs(x - 50) < 1e-9)!
+    expect(tip[1]).toBe(Math.min(...pieces[0].outer.map((p) => p[1])))
+  })
+})

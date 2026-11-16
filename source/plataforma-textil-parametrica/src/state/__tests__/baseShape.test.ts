@@ -37,3 +37,23 @@ describe('base personalizada con varias piezas', () => {
     expect(useAppStore.getState().baseShape!.pieces).toHaveLength(2)
   })
 })
+
+describe('atractores del modo laser acompanan el tamano de la pieza', () => {
+  it('probeta 200 mm -> base de 1200 mm: posiciones y radios x6; reset no escala', () => {
+    const st = useAppStore.getState
+    st().reset()
+    const before = st().laserAttractors
+    st().setLaserPiece('custom')
+    st().setBaseShape({ pieces: [{ outer: rect(1200, 600), holes: [] }], mmPerUnit: 1 }, 200, 'falda.pdf')
+    const after = st().laserAttractors
+    expect(after).toHaveLength(before.length)
+    after.forEach((a, k) => {
+      const b = before[k]
+      expect(a.radius).toBeCloseTo(b.radius * 6, 6)
+      if (a.kind === 'point' && b.kind === 'point') expect(a.position.x).toBeCloseTo(b.position.x * 6, 6)
+      if (a.kind === 'curve' && b.kind === 'curve') expect(a.points[0].z).toBeCloseTo(b.points[0].z * 6, 6)
+    })
+    st().reset()
+    expect(st().laserAttractors[0].radius).toBeCloseTo(before[0].radius, 6)
+  })
+})

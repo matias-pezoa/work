@@ -160,9 +160,9 @@ function PieceThumb({ piece }: { piece: ImportedBoundary }) {
   const b = polygonBounds(piece.outer)
   const size = Math.max(b.maxX - b.minX, b.maxZ - b.minZ, 1e-6)
   const pad = size * 0.06
-  // Y del archivo hacia arriba -> SVG hacia abajo.
+  // las piezas ya vienen con Y hacia abajo, como el SVG.
   const ring = (pts: readonly Vec2[]) =>
-    'M' + pts.map(([x, z]) => `${(x - b.minX).toFixed(2)} ${(b.maxZ - z).toFixed(2)}`).join('L') + 'Z'
+    'M' + pts.map(([x, z]) => `${(x - b.minX).toFixed(2)} ${(z - b.minZ).toFixed(2)}`).join('L') + 'Z'
   return (
     <svg
       viewBox={`${-pad} ${-pad} ${b.maxX - b.minX + 2 * pad} ${b.maxZ - b.minZ + 2 * pad}`}

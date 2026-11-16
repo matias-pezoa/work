@@ -153,7 +153,9 @@ export function AttractorEditor({
           {ATTRACTOR_UI_PARAMS.map((p) => (
             <ParamSlider
               key={p.key}
-              param={p}
+              // el radio llega al menos al lado de la pieza (una falda de 1,2 m
+              // necesita radios mayores que la probeta de 200 mm).
+              param={p.key === 'radius' ? { ...p, max: Math.max(p.max, Math.ceil(planeSize)) } : p}
               value={p.key === 'radius' ? selected.radius : selected.strength}
               onChange={(v) =>
                 set.update(

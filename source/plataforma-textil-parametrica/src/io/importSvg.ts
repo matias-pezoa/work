@@ -156,7 +156,7 @@ export function parseSvgToShapes(svgText: string): ImportedShapes {
     }
 
     // cada contorno suelto es una pieza; los que caen dentro de una, sus agujeros.
-    return { pieces: loopsToPieces(loops.map(flipY), 'SVG') }
+    return { pieces: loopsToPieces(loops, 'SVG') }
   })
 }
 
@@ -185,9 +185,4 @@ function sampleShape(el: SVGGeometryElement, includeEnd = false): Vec2[] | null 
     points.push([transformed.x, transformed.y])
   }
   return points
-}
-
-/** SVG crece en Y hacia abajo; se invierte para que "arriba en el papel" sea +Z. */
-function flipY(points: readonly Vec2[]): Vec2[] {
-  return points.map(([x, y]) => [x, -y] as Vec2)
 }

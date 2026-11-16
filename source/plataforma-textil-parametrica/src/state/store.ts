@@ -27,8 +27,10 @@ import {
 } from '../geometry/polygon'
 import type { ImportedBoundary, ImportedShapes } from '../io/importBoundary'
 import type { ImportedImage } from '../io/importImage'
+import { SPECIMEN_SIZE_MM } from '../geometry/laserSpecimens'
 import {
   applyAttractorPatch,
+  scaleAttractor,
   createAttractor,
   createCurveAttractor,
   type Attractor,
@@ -538,3 +540,31 @@ export const useAppStore = create<AppState>((set) => ({
       gizmoMode: 'translate',
     }),
 }))
+
+/**
+ * Lado mayor (mm) de la pieza del modo Corte laser: la probeta, la base
+ * importada o la medida libre. Mismo criterio que App/LaserPanel.
+ */
+export function laserExtentMm(
+  s: Pick<AppState, 'laserPiece' | 'baseShape' | 'laser'>,
+): number {
+  if (s.laserPiece === 'specimen') return SPECIMEN_SIZE_MM
+  if (s.baseShape) return Math.max(s.baseShape.widthMm, s.baseShape.heightMm)
+  return Math.max(s.laser.sheetWidthMm, s.laser.sheetHeightMm)
+}
+
+// Cuando la pieza del modo laser cambia de tamano (importar una base, elegir
+// otra pieza, cambiar su ancho, pasar de probeta a medida libre) los
+// atractores se escalan igual: el diseno sigue cubriendo la pieza en vez de
+// quedar como un parche de 200 mm al centro de una falda de 1,2 m. No se
+// escala si la misma actualizacion ya reemplazo los atractores (reset).
+useAppStore.subscribe((s, prev) => {
+  const next = laserExtentMm(s)
+  const before = laserExtentMm(prev)
+  if (s.laserAttractors !== prev.laserAttractors) return
+  if (!(next > 0) || !(before > 0) || Math.abs(next / before - 1) < 1e-9) return
+  const factor = next / before
+  useAppStore.setState({
+    laserAttractors: s.laserAttractors.map((a) => scaleAttractor(a, factor)),
+  })
+})

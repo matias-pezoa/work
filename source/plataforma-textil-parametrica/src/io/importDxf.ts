@@ -7,12 +7,13 @@
  * los DXF AAMA/ASTM de patronaje, que guardan cada pieza en un bloque). Los
  * tramos sueltos (LINE + ARC) se unen por sus extremos en lazos cerrados.
  *
- * DXF ya tiene Y hacia arriba como el plano de la app: no se invierte.
+ * DXF tiene Y hacia arriba: se invierte al final (`flipLoopsY`).
  * Entidades en el espacio papel (codigo 67 = 1) se ignoran.
  */
 import type { Vec2 } from '../geometry/polygon'
 import {
   closedLoops,
+  flipLoopsY,
   joinTolerance,
   loopsToPieces,
   type ImportedPolyline,
@@ -42,7 +43,10 @@ export async function importDxfFile(file: File): Promise<ImportedShapes> {
 export function parseDxfToShapes(text: string): ImportedShapes {
   const dxf = parseDxf(text)
   const polylines = dxf.entities.flatMap((e) => entityPolylines(e, dxf.blocks, IDENTITY, 0))
-  const pieces = loopsToPieces(closedLoops(polylines, joinTolerance(polylines)), 'DXF')
+  const pieces = loopsToPieces(
+    flipLoopsY(closedLoops(polylines, joinTolerance(polylines))),
+    'DXF',
+  )
   const mmPerUnit = dxf.insUnits ? INSUNITS_MM[dxf.insUnits] : undefined
   return mmPerUnit ? { pieces, mmPerUnit } : { pieces }
 }

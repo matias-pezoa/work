@@ -413,6 +413,17 @@ atractores/campo de ninguno de los dos modos.
   (`pieceIndex`); `selectBasePiece` cambia de pieza CONSERVANDO los mm por
   unidad, para que las piezas de un patron mantengan su proporcion. El panel
   (`PiecePicker` en BaseShapeImporter) muestra miniaturas si hay mas de una.
+  ORIENTACION: las piezas importadas tienen Y hacia ABAJO como el SVG (el SVG
+  no se invierte; DXF/PDF se invierten con `flipLoopsY`), porque en el plano
+  de la app +z es abajo en la vista laser y en el export, y hacia la camara
+  en 3D. Antes se invertia el SVG y todo salia espejado verticalmente (una
+  pieza asimetrica se cortaba al reves).
+- `store.ts` escala `laserAttractors` (posicion, puntos, radio; `scaleAttractor`)
+  con un `subscribe` cuando cambia el lado mayor de la pieza laser
+  (`laserExtentMm`: probeta / base importada / medida libre). Sin esto, los
+  atractores por defecto (pensados para 200 mm) quedaban como un parche al
+  centro de una pieza de 1,2 m y "no se veian calados". El slider de radio
+  llega al menos al lado de la pieza (AttractorEditor).
 - `io/importDxf.ts`: lector DXF ASCII propio, sin dependencias:
   LWPOLYLINE/POLYLINE (bulge), LINE, ARC, CIRCLE, ELLIPSE, SPLINE (NURBS por
   de Boor), INSERT de bloques (piezas AAMA/ASTM) con escala/rotacion, OCS con

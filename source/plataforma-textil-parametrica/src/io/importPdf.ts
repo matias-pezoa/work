@@ -10,11 +10,12 @@
  * Illustrator), el texto y las imagenes. Un PDF escaneado (solo imagen) no
  * tiene contornos: hay que vectorizarlo antes o exportarlo como PDF vectorial.
  *
- * PDF tiene Y hacia arriba como el plano de la app; unidades en puntos.
+ * PDF tiene Y hacia arriba (se invierte al final, `flipLoopsY`); unidades en puntos.
  */
 import type { Vec2 } from '../geometry/polygon'
 import {
   closedLoops,
+  flipLoopsY,
   joinTolerance,
   loopsToPieces,
   type ImportedPolyline,
@@ -44,7 +45,10 @@ export async function importPdfFile(file: File): Promise<ImportedShapes> {
     const page = await doc.getPage(1)
     const list = await page.getOperatorList()
     const polylines = pdfOperatorPolylines(list.fnArray, list.argsArray, pdfjs.OPS)
-    const pieces = loopsToPieces(closedLoops(polylines, joinTolerance(polylines)), 'PDF')
+    const pieces = loopsToPieces(
+      flipLoopsY(closedLoops(polylines, joinTolerance(polylines))),
+      'PDF',
+    )
     return { pieces, mmPerUnit: MM_PER_PT }
   } finally {
     // destruir la tarea libera el documento y el worker.

@@ -139,6 +139,17 @@ export function applyAttractorPatch(a: Attractor, patch: AttractorPatch): Attrac
   }
 }
 
+/**
+ * Escala un atractor respecto del origen (centro de la pieza): posicion,
+ * puntos de control y radio. Para que el diseno acompane un cambio de tamano
+ * de la pieza (p. ej. de la probeta de 200 mm a una falda de 1,2 m).
+ */
+export function scaleAttractor(a: Attractor, factor: number): Attractor {
+  const radius = a.radius * factor
+  if (a.kind === 'point') return { ...a, radius, position: a.position.clone().multiplyScalar(factor) }
+  return { ...a, radius, points: a.points.map((p) => p.clone().multiplyScalar(factor)) }
+}
+
 // ------------------------------------------------------------ curva Bezier
 
 /** Muestras por tramo curvo al teselar (un tramo recto usa solo sus extremos). */

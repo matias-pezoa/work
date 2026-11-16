@@ -8,7 +8,11 @@
  */
 import { pointInPolygon, polygonArea, polygonBounds, type Vec2 } from '../geometry/polygon'
 
-/** Una pieza, en las unidades del archivo y con Y hacia arriba. */
+/**
+ * Una pieza, en las unidades del archivo y con Y hacia ABAJO como el SVG: el
+ * plano de la app (x, z) tiene +z hacia abajo en la vista laser, en el export
+ * y hacia la camara en 3D, asi "arriba en el papel" queda arriba en pantalla.
+ */
 export interface ImportedBoundary {
   outer: Vec2[]
   holes: Vec2[][]
@@ -24,7 +28,7 @@ export interface ImportedShapes {
   mmPerUnit?: number
 }
 
-/** Trazo leido de un archivo, en sus propias unidades y con Y hacia arriba. */
+/** Trazo leido de un archivo, en sus propias unidades (Y segun el formato). */
 export interface ImportedPolyline {
   points: Vec2[]
   closed: boolean
@@ -78,6 +82,11 @@ export function closedLoops(polylines: readonly ImportedPolyline[], tol: number)
     if (chain.length > 2 && near(chain[0], chain[chain.length - 1])) loops.push(dropEnd(chain))
   }
   return loops.filter((l) => l.length >= 3 && polygonArea(l) > 0)
+}
+
+/** DXF y PDF tienen Y hacia arriba: se invierte para la convencion de `ImportedBoundary`. */
+export function flipLoopsY(loops: readonly Vec2[][]): Vec2[][] {
+  return loops.map((l) => l.map(([x, y]): Vec2 => [x, -y]))
 }
 
 /** Tolerancia de union de extremos: una fraccion pequena del tamano del dibujo. */
