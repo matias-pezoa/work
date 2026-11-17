@@ -174,7 +174,11 @@ export interface AppState {
    * Carga las piezas de un archivo y activa la primera (la de mayor area), a
    * su medida real si el archivo trae unidades; si no, a `fallbackWidthMm`.
    */
-  setBaseShape: (imported: ImportedShapes, fallbackWidthMm: number, fileName: string) => void
+  setBaseShape: (
+    imported: ImportedShapes,
+    fallbackWidthMm: number,
+    fileName: string,
+  ) => void
   /** Cambia la pieza activa manteniendo la escala: las piezas conservan su proporcion entre si. */
   selectBasePiece: (index: number) => void
   setBaseShapeWidthMm: (widthMm: number) => void

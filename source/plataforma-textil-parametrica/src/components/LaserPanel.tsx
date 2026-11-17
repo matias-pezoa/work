@@ -21,6 +21,7 @@ import {
   MIN_FEATURE_MM,
   RADIAL_UI_PARAMS,
   SHEET_UI_PARAMS,
+  EDGE_MARGIN_PARAM,
   SYMMETRY_ORDER_PARAM,
   BED_UI_PARAMS,
   IMAGE_BITMAP_UI_PARAMS,
@@ -56,6 +57,7 @@ import {
   type SwatchVariant,
 } from '../geometry/laserSwatch'
 import {
+  CLO_SLOT_PARAM,
   downloadBedAi,
   downloadBedDxf,
   downloadBedPdf,
@@ -82,6 +84,8 @@ import {
 
 interface LaserPanelProps {
   result: LaserCutResult
+  /** El diseno se esta recalculando (worker): lo que se ve es el anterior. */
+  pending?: boolean
   /** Familia capas: piezas distribuidas en la cama (null en las demas). */
   bed: BedLayout | null
   /** Puas del modo Volumen disponibles para la familia "huella". */
@@ -133,7 +137,12 @@ const SPECIMEN_NUMBER_PARAM = {
   unit: '-',
 } as const
 
-export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
+export function LaserPanel({
+  result,
+  pending = false,
+  bed,
+  spikeCount,
+}: LaserPanelProps) {
   const laser = useAppStore((s) => s.laser)
   const setParam = useAppStore((s) => s.setLaserParam)
   const setOption = useAppStore((s) => s.setLaserOption)
@@ -185,11 +194,26 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
       : family === 'hinge'
         ? `corte-laser-bisagra-${laser.hingePattern}`
         : `corte-laser-${family}`
+  // el generador nunca deja un corte a menos del puente (+ medio kerf) del borde.
+  const marginFloorMm = result.bridgeMm + Math.max(0, laser.kerfMm) / 2
   // la probeta se nombra con el apellido: sin el no se exporta.
-  const canExport = !specimen || who !== ''
+  const named = !specimen || who !== ''
+  // mientras se recalcula no se exporta: saldria el diseno anterior.
+  const canExport = named && !pending
   const empty = result.calados + result.cortes === 0
   // la probeta se exporta sin aire: el archivo mide 200 x 200 mm.
   const pad = specimen ? 0 : undefined
+  // CLO3D solo corta poligonos cerrados: los cortes abiertos salen como ranura.
+  const [forClo, setForClo] = useState(false)
+  const [cloSlotMm, setCloSlotMm] = useState(CLO_SLOT_PARAM.default)
+  const openCuts = result.paths.filter((p) => !p.closed).length
+  const exportName = forClo ? `${filename}_clo3d` : filename
+  // cloExport (Clipper2) se carga recien al exportar para CLO3D.
+  const forExport = async <T extends Pick<LaserCutResult, 'paths'>>(r: T): Promise<T> => {
+    if (!forClo) return r
+    const { closeOpenCuts } = await import('../io/cloExport')
+    return closeOpenCuts(r, cloSlotMm)
+  }
 
   const downloadSwatch = (variant: SwatchVariant) =>
     downloadSwatchSvg(
@@ -226,6 +250,13 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
         </p>
         {!specimen && !baseShape && family !== 'footprint' && SHEET_UI_PARAMS.map(slider)}
         {!specimen && <BaseShapeImporter />}
+        {slider(EDGE_MARGIN_PARAM)}
+        <p className="hint">
+          Zona libre de cortes junto al borde. Si el molde ya trae 1 cm de costura, 20 mm
+          deja 1 cm libre dentro de la linea de costura para coser.
+          {laser.edgeMarginMm < marginFloorMm &&
+            ` Minimo real: ${marginFloorMm.toFixed(1)} mm (el puente de material, para que ningun calado corte el borde).`}
+        </p>
       </section>
 
       <section>
@@ -512,9 +543,10 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
             onChange={setSpecimenNumber}
           />
         )}
-        {canExport ? (
+        {named ? (
           <p className="hint">
             Archivo: <code>{filename}</code>
+            {pending && ' · Calculando…'}
           </p>
         ) : (
           <p className="hint error">
@@ -550,6 +582,24 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
             Todavia no hay nada que cortar: revisa el patron o agrega atractores.
           </p>
         )}
+        <label className="check">
+          <input type="checkbox" checked={forClo} onChange={() => setForClo(!forClo)} />
+          Para CLO3D: cerrar los cortes abiertos
+        </label>
+        {forClo && (
+          <>
+            <ParamSlider
+              param={CLO_SLOT_PARAM}
+              value={cloSlotMm}
+              onChange={setCloSlotMm}
+            />
+            <p className="hint">
+              {openCuts > 0
+                ? `${openCuts} corte(s) de una sola linea salen como un poligono cerrado de ${cloSlotMm.toFixed(2)} mm de ancho, para poder cortarlos en CLO3D. Los que se tocan (cruces, tripodes) salen como un solo contorno. Calados y contorno no cambian.`
+                : 'Este patron no tiene cortes de una sola linea: el archivo sale igual.'}
+            </p>
+          </>
+        )}
         {family === 'layers' ? (
           <>
             {BED_UI_PARAMS.map(slider)}
@@ -571,7 +621,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
                 type="button"
                 className="primary"
                 disabled={!bed || !canExport}
-                onClick={() => bed && downloadBedSvg(bed, filename)}
+                onClick={() =>
+                  bed && void forExport(bed).then((b) => downloadBedSvg(b, exportName))
+                }
               >
                 SVG
               </button>
@@ -579,7 +631,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
                 type="button"
                 className="primary"
                 disabled={!bed || !canExport}
-                onClick={() => bed && downloadBedDxf(bed, filename)}
+                onClick={() =>
+                  bed && void forExport(bed).then((b) => downloadBedDxf(b, exportName))
+                }
               >
                 DXF
               </button>
@@ -587,7 +641,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
                 type="button"
                 className="primary"
                 disabled={!bed || !canExport}
-                onClick={() => bed && downloadBedAi(bed, filename)}
+                onClick={() =>
+                  bed && void forExport(bed).then((b) => downloadBedAi(b, exportName))
+                }
               >
                 AI
               </button>
@@ -595,7 +651,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
                 type="button"
                 className="primary"
                 disabled={!bed || !canExport}
-                onClick={() => bed && downloadBedPdf(bed, filename)}
+                onClick={() =>
+                  bed && void forExport(bed).then((b) => downloadBedPdf(b, exportName))
+                }
               >
                 PDF
               </button>
@@ -607,7 +665,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               type="button"
               className="primary"
               disabled={!canExport}
-              onClick={() => downloadLaserSvg(result, filename, pad)}
+              onClick={() =>
+                void forExport(result).then((r) => downloadLaserSvg(r, exportName, pad))
+              }
             >
               SVG
             </button>
@@ -615,7 +675,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               type="button"
               className="primary"
               disabled={!canExport}
-              onClick={() => downloadLaserDxf(result, filename)}
+              onClick={() =>
+                void forExport(result).then((r) => downloadLaserDxf(r, exportName))
+              }
             >
               DXF
             </button>
@@ -623,7 +685,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               type="button"
               className="primary"
               disabled={!canExport}
-              onClick={() => downloadLaserAi(result, filename, pad)}
+              onClick={() =>
+                void forExport(result).then((r) => downloadLaserAi(r, exportName, pad))
+              }
             >
               AI
             </button>
@@ -631,7 +695,9 @@ export function LaserPanel({ result, bed, spikeCount }: LaserPanelProps) {
               type="button"
               className="primary"
               disabled={!canExport}
-              onClick={() => downloadLaserPdf(result, filename, pad)}
+              onClick={() =>
+                void forExport(result).then((r) => downloadLaserPdf(r, exportName, pad))
+              }
             >
               PDF
             </button>

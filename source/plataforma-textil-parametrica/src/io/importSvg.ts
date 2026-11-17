@@ -12,7 +12,7 @@
  * de una pieza son sus agujeros (p. ej. pinzas). Ver `loopsToPieces`.
  */
 import { polygonBounds, type Vec2 } from '../geometry/polygon'
-import { loopsToPieces, type ImportedShapes } from './importBoundary'
+import { loopsToPieces, simplify, type ImportedShapes } from './importBoundary'
 
 export type { ImportedBoundary, ImportedShapes } from './importBoundary'
 
@@ -112,38 +112,6 @@ function isClosedShape(el: SVGGeometryElement, pts: readonly Vec2[]): boolean {
     Math.hypot(a[0] - b[0], a[1] - b[1]) <
     1e-6 * Math.max(1, Math.abs(a[0]) + Math.abs(a[1]))
   )
-}
-
-/** Ramer-Douglas-Peucker: saca vertices colineales (una recta muestreada queda en 2 puntos). */
-function simplify(points: readonly Vec2[], eps: number): Vec2[] {
-  if (points.length < 3) return [...points]
-  const keep = new Array<boolean>(points.length).fill(false)
-  keep[0] = keep[points.length - 1] = true
-  const stack: [number, number][] = [[0, points.length - 1]]
-  while (stack.length) {
-    const [i, j] = stack.pop()!
-    const [ax, az] = points[i]
-    const [bx, bz] = points[j]
-    const len = Math.hypot(bx - ax, bz - az)
-    let best = -1
-    let idx = -1
-    for (let k = i + 1; k < j; k++) {
-      const [px, pz] = points[k]
-      const d =
-        len < 1e-12
-          ? Math.hypot(px - ax, pz - az)
-          : Math.abs((bx - ax) * (az - pz) - (ax - px) * (bz - az)) / len
-      if (d > best) {
-        best = d
-        idx = k
-      }
-    }
-    if (best > eps) {
-      keep[idx] = true
-      stack.push([i, idx], [idx, j])
-    }
-  }
-  return points.filter((_, k) => keep[k])
 }
 
 /** Version testeable: recibe el texto del SVG directamente. */

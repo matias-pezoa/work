@@ -40,11 +40,10 @@ export function BaseShapeImporter() {
     <section>
       <h3>Base personalizada</h3>
       <p className="hint">
-        Importa un SVG, DXF o PDF vectorial (p. ej. una pieza de patron) para
-        trabajar solo dentro de ese contorno, en vez del panel cuadrado. Un segundo
-        contorno cerrado dentro del primero se trata como agujero (p. ej. una
-        pinza). Si el archivo trae varias piezas, elige con cual trabajar. DXF y
-        PDF conservan su medida real.
+        Importa un SVG, DXF o PDF vectorial (p. ej. una pieza de patron) para trabajar
+        solo dentro de ese contorno, en vez del panel cuadrado. Un segundo contorno
+        cerrado dentro del primero se trata como agujero (p. ej. una pinza). Si el archivo
+        trae varias piezas, elige con cual trabajar. DXF y PDF conservan su medida real.
       </p>
 
       <label htmlFor={inputId} className="file-drop">
@@ -162,7 +161,11 @@ function PieceThumb({ piece }: { piece: ImportedBoundary }) {
   const pad = size * 0.06
   // las piezas ya vienen con Y hacia abajo, como el SVG.
   const ring = (pts: readonly Vec2[]) =>
-    'M' + pts.map(([x, z]) => `${(x - b.minX).toFixed(2)} ${(z - b.minZ).toFixed(2)}`).join('L') + 'Z'
+    'M' +
+    pts
+      .map(([x, z]) => `${(x - b.minX).toFixed(2)} ${(z - b.minZ).toFixed(2)}`)
+      .join('L') +
+    'Z'
   return (
     <svg
       viewBox={`${-pad} ${-pad} ${b.maxX - b.minX + 2 * pad} ${b.maxZ - b.minZ + 2 * pad}`}

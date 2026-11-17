@@ -84,6 +84,19 @@ Se agregan en la fase que las necesita, no antes:
 - Preferir composicion de funciones puras sobre clases.
 - La geometria (BufferGeometry) se calcula en `App.tsx` con `useMemo` y se libera
   con `useDisposePrevious`; los componentes de escena solo renderizan.
+- RENDIMIENTO: Corte laser y Ondas se calculan en Web Workers
+  (`src/workers/`: `laserCut.worker.ts`, `waveField.worker.ts`) con
+  `LatestJobWorker` (se queda SIEMPRE con el ultimo pedido: al arrastrar un
+  slider no se encola nada; la vista muestra el ultimo resultado listo). Solo
+  el primer resultado de cada modo se calcula sincronico (para no arrancar
+  vacio). Si el worker falla o no existe, cae al hilo principal. Lo que
+  cruza el postMessage pierde clases: `reviveAttractor` rearma Vector3 y
+  `pack/unpackWaveResult` transfiere la malla como arreglos tipados.
+  Ondas SOLO se calcula en su modo (antes se rehacia en cada cambio de la
+  base aunque se estuviera en laser: 2 s por paso con una falda de 1,2 m).
+  Laser exporta solo con el resultado al dia (`pending` -> "Calculando…").
+  Medido (falda circular, 20 pasos de un slider): laser 15 s de bloqueo -> 0;
+  Ondas 82 s -> ~4 s (el resto es subir la malla a la GPU).
 
 ## Estructura de carpetas
 ```
@@ -100,7 +113,8 @@ src/
                   #   BaseShapeImporter/BaseShapeGround (base personalizada)
                   #   compartidos entre ambos modos 3D, ParamSlider
   scene/          # Viewport (canvas R3F, luces, grid, OrbitControls)
-  io/             # exportSTL, importBase (SVG/DXF/PDF -> contorno)
+  io/             # exportSTL, importBase (SVG/DXF/PDF -> contorno), exportLaser, cloExport
+  workers/        # Web Workers de Corte laser y Ondas + LatestJobWorker
   state/          # store de zustand
   utils/          # units, params, random
 ```
@@ -270,6 +284,18 @@ src/
   `S` por trazo, cerrados con vertice de cierre + `h`. Sin marco de cama,
   como el .ai. Test de ida y vuelta con pdf.js (`exportLaser.test.ts`):
   xref, tamano de pagina, capas y trazos cerrados.
+- Export "Para CLO3D" (casilla en LaserPanel, estado local): CLO solo corta
+  poligonos cerrados. `io/cloExport.ts` `closeOpenCuts(result, mm)` (import
+  dinamico al exportar): cada corte ABIERTO -> ranura cerrada de
+  `CLO_SLOT_PARAM` (0.1–2 mm, def. 0.2) con `polylineOutline` (polygon.ts:
+  inglete, extremos rectos), y las ranuras que se tocan se FUNDEN en un solo
+  contorno con `Clipper.Union` (clipper2-js 1.2.4, enteros en micrones).
+  Los extremos que caen sobre otro corte (horquilla de la cruz, centro del
+  tripode; `joinedEnds` con grilla) se prolongan medio ancho: si no, las
+  ranuras solo se tocan de punta y la union no las junta. NO usar
+  `Clipper.InflatePaths` con trazos abiertos: en clipper2-js 1.2.4 parte un
+  arco en decenas de fragmentos (verificado). Vale para SVG/DXF/AI/PDF,
+  pieza y cama; nombre `..._clo3d`. Calados/contorno no cambian.
 - Tests: `laserImage.test.ts`, `laserSpecimens.test.ts` (probeta, nombre, AI,
   tipografia).
 
@@ -424,6 +450,14 @@ atractores/campo de ninguno de los dos modos.
   vertice a mas de 1/4 del lado menor del borde) la DESCARTA en vez de
   tomarla como agujero — si no, el agujero tapaba la pieza y casi no habia
   calados (molde Molly: 24 -> 496). Pinzas y piquetes siguen como agujeros.
+  MARGEN AL BORDE (`EDGE_MARGIN_PARAM`, laserCut.ts): 20 mm por defecto,
+  0–100 mm, visible en "1 · Pieza" para probeta y base. Motivo: los alumnos
+  exportan el molde CON 1 cm de costura y necesitan 1 cm libre mas adentro
+  para coser. Con 0 el generador igual respeta puente + kerf/2 (el panel
+  avisa el "minimo real").
+  SIMPLIFICACION: `loopsToPieces` pasa cada lazo por RDP (`simplifyLoop`,
+  tolerancia 5e-5 de la diagonal del dibujo, ~0,07 mm en 1,2 m): la falda
+  circular baja de 1408 a ~190 vertices y el laser va 5-8x mas rapido.
   Caso ambiguo conocido: una pieza tipo anillo con agujero grande y cercano
   al borde se leeria como costura.
   ORIENTACION: las piezas importadas tienen Y hacia ABAJO como el SVG (el SVG

@@ -140,13 +140,24 @@ export function applyAttractorPatch(a: Attractor, patch: AttractorPatch): Attrac
 }
 
 /**
+ * Rearma los `THREE.Vector3` de un atractor que cruzo a/desde un Web Worker:
+ * `postMessage` copia sus x/y/z pero no la clase (sin metodos).
+ */
+export function reviveAttractor(a: Attractor): Attractor {
+  if (a.kind === 'point')
+    return { ...a, position: new THREE.Vector3(a.position.x, a.position.y, a.position.z) }
+  return { ...a, points: a.points.map((p) => new THREE.Vector3(p.x, p.y, p.z)) }
+}
+
+/**
  * Escala un atractor respecto del origen (centro de la pieza): posicion,
  * puntos de control y radio. Para que el diseno acompane un cambio de tamano
  * de la pieza (p. ej. de la probeta de 200 mm a una falda de 1,2 m).
  */
 export function scaleAttractor(a: Attractor, factor: number): Attractor {
   const radius = a.radius * factor
-  if (a.kind === 'point') return { ...a, radius, position: a.position.clone().multiplyScalar(factor) }
+  if (a.kind === 'point')
+    return { ...a, radius, position: a.position.clone().multiplyScalar(factor) }
   return { ...a, radius, points: a.points.map((p) => p.clone().multiplyScalar(factor)) }
 }
 

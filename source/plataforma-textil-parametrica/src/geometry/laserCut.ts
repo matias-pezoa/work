@@ -37,7 +37,9 @@
  *     `minBridgeMm` de material real (ya descontado el kerf). Los tamanos se
  *     recortan a lo que la grilla permite; nunca se acepta un solape.
  *   - MARGEN AL BORDE: ningun corte se acerca al contorno (ni a sus agujeros)
- *     a menos de `edgeMarginMm` (y nunca menos que el puente).
+ *     a menos de `edgeMarginMm` (y nunca menos que el puente). 20 mm por
+ *     defecto: los moldes llegan con 1 cm de costura incluido y hace falta
+ *     1 cm libre mas adentro para poder coser sin pisar los calados.
  *   - RASGO MINIMO: perforaciones o cortes mas chicos que `MIN_FEATURE_MM` no
  *     se generan (el haz solo quemaria un punto).
  *   - KERF: los calados cerrados se ofsetean kerf/2 HACIA ADENTRO y el
@@ -335,7 +337,7 @@ export const DEFAULT_LASER: LaserParams = {
   materialId: 'felt',
   kerfMm: 0.3,
   minBridgeMm: 3,
-  edgeMarginMm: 6,
+  edgeMarginMm: 20,
   sheetWidthMm: 300,
   sheetHeightMm: 200,
   fieldThreshold: 0.05,
@@ -433,6 +435,21 @@ export interface LaserParam extends NumberParam {
   readonly key: LaserNumericKey
 }
 
+/**
+ * Margen libre entre el borde de la pieza y los cortes. 20 mm por defecto
+ * (1 cm de costura que ya trae el molde + 1 cm libre para coser). Con 0 igual
+ * queda el puente de material: un calado nunca corta el borde.
+ */
+export const EDGE_MARGIN_PARAM: LaserParam = {
+  key: 'edgeMarginMm',
+  label: 'Margen al borde',
+  min: 0,
+  max: 100,
+  step: 1,
+  default: 20,
+  unit: 'mm',
+}
+
 export const MATERIAL_UI_PARAMS: readonly LaserParam[] = [
   {
     key: 'kerfMm',
@@ -452,15 +469,7 @@ export const MATERIAL_UI_PARAMS: readonly LaserParam[] = [
     default: 3,
     unit: 'mm',
   },
-  {
-    key: 'edgeMarginMm',
-    label: 'Margen al borde',
-    min: MIN_BRIDGE_MM,
-    max: 40,
-    step: 0.5,
-    default: 6,
-    unit: 'mm',
-  },
+  EDGE_MARGIN_PARAM,
 ]
 
 export const SHEET_UI_PARAMS: readonly LaserParam[] = [

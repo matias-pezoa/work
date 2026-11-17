@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { buildLaserCut, DEFAULT_LASER } from '../../geometry/laserCut'
 import { createAttractor } from '../../geometry/attractionField'
-import { closedPoints, laserToAi, laserToDxf, laserToPdf, laserToSvg, pathData } from '../exportLaser'
+import {
+  closedPoints,
+  laserToAi,
+  laserToDxf,
+  laserToPdf,
+  laserToSvg,
+  pathData,
+} from '../exportLaser'
+import { polygonArea, polylineLength } from '../../geometry/polygon'
+import { closeOpenCuts } from '../cloExport'
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { pdfOperatorPolylines } from '../importPdf'
 
@@ -137,8 +146,12 @@ describe('laserToPdf', () => {
   it('xref exacta: cada desplazamiento apunta al inicio de su objeto', () => {
     const start = Number(pdf.match(/startxref\n(\d+)/)![1])
     expect(pdf.slice(start, start + 4)).toBe('xref')
-    const offsets = [...pdf.slice(start).matchAll(/^(\d{10}) 00000 n $/gm)].map((m) => Number(m[1]))
-    offsets.forEach((o, k) => expect(pdf.slice(o, o + `${k + 1} 0 obj`.length)).toBe(`${k + 1} 0 obj`))
+    const offsets = [...pdf.slice(start).matchAll(/^(\d{10}) 00000 n $/gm)].map((m) =>
+      Number(m[1]),
+    )
+    offsets.forEach((o, k) =>
+      expect(pdf.slice(o, o + `${k + 1} 0 obj`.length)).toBe(`${k + 1} 0 obj`),
+    )
   })
 
   it('pdf.js lo lee: pagina a escala real, capas y trazos cerrados', async () => {
@@ -153,7 +166,100 @@ describe('laserToPdf', () => {
     expect(names).toEqual(['GRABADO', 'CALADO', 'CONTORNO'])
     const list = await page.getOperatorList()
     const polys = pdfOperatorPolylines(list.fnArray, list.argsArray, pdfjs.OPS)
-    expect(polys.filter((p) => p.closed)).toHaveLength(r.paths.filter((p) => p.closed).length)
+    expect(polys.filter((p) => p.closed)).toHaveLength(
+      r.paths.filter((p) => p.closed).length,
+    )
     await task.destroy()
+  })
+})
+
+describe('CLO3D: cortes abiertos como poligono cerrado', () => {
+  const sheet = { minX: -50, maxX: 50, minZ: -50, maxZ: 50 }
+  const open = (...pts: [number, number][]) => ({
+    layer: 'corte' as const,
+    points: pts,
+    closed: false,
+  })
+
+  it('una recta pasa a ser un rectangulo de largo x ancho', () => {
+    const { paths } = closeOpenCuts(
+      { paths: [open([0, 0], [10, 0])], bounds: sheet },
+      0.2,
+    )
+    expect(paths).toHaveLength(1)
+    expect(paths[0].closed).toBe(true)
+    expect(polygonArea(paths[0].points)).toBeCloseTo(2, 3)
+  })
+
+  it('dos cortes que se cruzan salen como UN contorno', () => {
+    const { paths } = closeOpenCuts(
+      { paths: [open([-10, 0], [10, 0]), open([0, -10], [0, 10])], bounds: sheet },
+      0.5,
+    )
+    expect(paths).toHaveLength(1)
+    expect(polygonArea(paths[0].points)).toBeCloseTo(2 * 20 * 0.5 - 0.5 * 0.5, 3)
+  })
+
+  it('escamas (cortes separados): una ranura por corte; calados y contorno intactos, contorno al final', () => {
+    const r = buildLaserCut(
+      [createAttractor(new THREE.Vector3(0, 0, 0), { radius: 10, falloff: 'linear' })],
+      { ...DEFAULT_LASER, family: 'scales' },
+    )
+    const openCuts = r.paths.filter((p) => !p.closed)
+    expect(openCuts.length).toBeGreaterThan(0)
+    const clo = closeOpenCuts(r, 0.3)
+    expect(clo.paths.every((p) => p.closed)).toBe(true)
+    const slots = clo.paths.filter((p) => p.layer === 'corte')
+    expect(slots).toHaveLength(openCuts.length)
+    const want = openCuts.reduce((s, p) => s + polylineLength(p.points, false), 0) * 0.3
+    const got = slots.reduce((s, p) => s + polygonArea(p.points), 0)
+    expect(got / want).toBeCloseTo(1, 2)
+    expect(clo.paths[clo.paths.length - 1].layer).toBe('contorno')
+    for (const p of r.paths.filter((q) => q.closed)) expect(clo.paths).toContain(p)
+  })
+
+  it('modulo tripode (dos trazos que se tocan): un contorno por tripode', () => {
+    const r = buildLaserCut(
+      [createAttractor(new THREE.Vector3(0, 0, 0), { radius: 10, falloff: 'linear' })],
+      { ...DEFAULT_LASER, family: 'module' },
+    )
+    const openCuts = r.paths.filter((p) => !p.closed).length
+    expect(openCuts).toBeGreaterThan(0)
+    const slots = closeOpenCuts(r, 0.2).paths.filter((p) => p.layer === 'corte')
+    expect(slots).toHaveLength(openCuts / 2)
+  })
+})
+
+describe('CLO3D: uniones de punta', () => {
+  it('bisagra cruz: tres trazos que solo se tocan de punta salen como un contorno', () => {
+    const r = buildLaserCut(
+      [createAttractor(new THREE.Vector3(0, 0, 0), { radius: 10, falloff: 'linear' })],
+      { ...DEFAULT_LASER, family: 'hinge', hingePattern: 'cross' },
+    )
+    const openCuts = r.paths.filter((p) => !p.closed).length
+    expect(openCuts % 3).toBe(0)
+    const slots = closeOpenCuts(r, 0.2).paths.filter((p) => p.layer === 'corte')
+    expect(slots).toHaveLength(openCuts / 3)
+  })
+
+  it('un extremo libre no se prolonga', () => {
+    const { paths } = closeOpenCuts(
+      {
+        paths: [
+          {
+            layer: 'corte',
+            points: [
+              [0, 0],
+              [10, 0],
+            ],
+            closed: false,
+          },
+        ],
+      },
+      0.4,
+    )
+    const xs = paths[0].points.map(([x]) => x)
+    expect(Math.min(...xs)).toBeCloseTo(0, 6)
+    expect(Math.max(...xs)).toBeCloseTo(10, 6)
   })
 })

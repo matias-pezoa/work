@@ -263,3 +263,32 @@ describe('huella de puas', () => {
     expect(r.bounds.maxZ - r.bounds.minZ).toBeCloseTo(300 + DEFAULT_LASER.kerfMm, 6)
   })
 })
+
+describe('margen al borde (zona libre para la costura)', () => {
+  const att = [
+    createAttractor(new THREE.Vector3(0, 0, 0), { radius: 20, falloff: 'linear' }),
+  ]
+  const nearest = (paths: CutPath[], sheet: Boundary) =>
+    Math.min(
+      ...paths
+        .filter((p) => p.layer !== 'contorno')
+        .flatMap((p) => p.points.map(([x, z]) => distanceToBoundaryEdges(x, z, sheet))),
+    )
+
+  it('por defecto 20 mm: 1 cm de costura + 1 cm libre', () => {
+    expect(DEFAULT_LASER.edgeMarginMm).toBe(20)
+  })
+
+  it('un margen de 35 mm se respeta', () => {
+    const r = buildLaserCut(att, { ...DEFAULT_LASER, edgeMarginMm: 35 })
+    expect(nearest(r.paths, r.sheet)).toBeGreaterThanOrEqual(35 - 1e-6)
+  })
+
+  it('con 0 queda el puente de material: ningun calado corta el borde', () => {
+    const r = buildLaserCut(att, { ...DEFAULT_LASER, edgeMarginMm: 0 })
+    const floor = r.bridgeMm + DEFAULT_LASER.kerfMm / 2
+    const d = nearest(r.paths, r.sheet)
+    expect(d).toBeGreaterThanOrEqual(floor - 1e-6)
+    expect(d).toBeLessThan(20) // y si se acerca mas que el margen por defecto
+  })
+})

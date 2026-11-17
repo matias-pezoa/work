@@ -15,7 +15,22 @@ import type { SwatchSheet } from '../geometry/laserSwatch'
 import type { BedLayout } from '../geometry/laserBed'
 import type { Vec2 } from '../geometry/polygon'
 import { textToStrokes } from '../geometry/strokeFont'
+import type { NumberParam } from '../utils/params'
 import { triggerDownload } from './download'
+
+/**
+ * Ancho de la ranura con que se cierran los cortes abiertos para CLO3D
+ * (`closeOpenCuts` en cloExport.ts, que se carga recien al exportar).
+ */
+export const CLO_SLOT_PARAM: NumberParam = {
+  key: 'cloSlotMm',
+  label: 'Ancho del corte cerrado',
+  min: 0.1,
+  max: 2,
+  step: 0.05,
+  default: 0.2,
+  unit: 'mm',
+}
 
 export const LAYER_COLORS: Record<CutLayer, { hex: string; aci: number; name: string }> =
   {
@@ -329,17 +344,28 @@ export function laserToPdf(
   const rgb = (hex: string) =>
     [1, 3, 5].map((k) => fmt(Number.parseInt(hex.slice(k, k + 2), 16) / 255)).join(' ')
 
-  const groups: { name: string; color: string; strokes: { points: readonly Vec2[]; closed: boolean }[] }[] = []
+  const groups: {
+    name: string
+    color: string
+    strokes: { points: readonly Vec2[]; closed: boolean }[]
+  }[] = []
   if (labels.length) {
     groups.push({
       name: 'GRABADO',
       color: '#000000',
-      strokes: labels.flatMap((l) => textToStrokes(l).map((points) => ({ points, closed: false }))),
+      strokes: labels.flatMap((l) =>
+        textToStrokes(l).map((points) => ({ points, closed: false })),
+      ),
     })
   }
   for (const layer of LAYER_ORDER) {
     const paths = result.paths.filter((p) => p.layer === layer && p.points.length >= 2)
-    if (paths.length) groups.push({ ...LAYER_COLORS[layer], color: LAYER_COLORS[layer].hex, strokes: paths })
+    if (paths.length)
+      groups.push({
+        ...LAYER_COLORS[layer],
+        color: LAYER_COLORS[layer].hex,
+        strokes: paths,
+      })
   }
 
   const content: string[] = [`${fmt(0.1 * PT_PER_MM)} w 0 J 0 j`]

@@ -178,6 +178,49 @@ export function polylineLength(points: readonly Vec2[], closed: boolean): number
 const MITER_LIMIT = 4
 
 /**
+ * Contorno cerrado de ancho `width` alrededor de una polilinea abierta (una
+ * "ranura"): el lado izquierdo a ida y el derecho a la vuelta, con uniones
+ * en inglete y extremos rectos justo en los extremos del trazo. Para
+ * programas que solo cortan poligonos cerrados (CLO3D). Sin repetir el
+ * primer vertice al final. Pensado para anchos chicos (decimas de mm).
+ */
+export function polylineOutline(points: readonly Vec2[], width: number): Vec2[] {
+  const pts = points.filter((p, i) => {
+    const q = points[i - 1]
+    return !q || Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-9
+  })
+  const n = pts.length
+  if (n < 2 || !(width > 0)) return []
+  const h = width / 2
+  // normal izquierda de cada tramo.
+  const normals: Vec2[] = []
+  for (let i = 0; i + 1 < n; i++) {
+    const [ax, az] = pts[i]
+    const [bx, bz] = pts[i + 1]
+    const len = Math.hypot(bx - ax, bz - az)
+    normals.push([-(bz - az) / len, (bx - ax) / len])
+  }
+  const left: Vec2[] = []
+  const right: Vec2[] = []
+  for (let i = 0; i < n; i++) {
+    const n1 = normals[Math.max(0, i - 1)]
+    const n2 = normals[Math.min(n - 2, i)]
+    const denom = 1 + n1[0] * n2[0] + n1[1] * n2[1]
+    let mx = (n1[0] + n2[0]) / Math.max(denom, 1e-9)
+    let mz = (n1[1] + n2[1]) / Math.max(denom, 1e-9)
+    const m = Math.hypot(mx, mz)
+    if (m > MITER_LIMIT) {
+      mx = (mx / m) * MITER_LIMIT
+      mz = (mz / m) * MITER_LIMIT
+    }
+    const [x, z] = pts[i]
+    left.push([x + mx * h, z + mz * h])
+    right.push([x - mx * h, z - mz * h])
+  }
+  return [...left, ...right.reverse()]
+}
+
+/**
  * Offset de un poligono cerrado simple, con uniones en inglete: `distance`
  * positiva lo agranda (hacia afuera), negativa lo achica. Pensado para
  * offsets CHICOS respecto del tamano de los rasgos (compensacion de kerf,

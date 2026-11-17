@@ -69,7 +69,13 @@ export interface PdfOps {
 }
 
 /** Comandos de `DrawOPS` dentro de los datos de un `constructPath` (pdf.js >= 5). */
-const DRAW = { moveTo: 0, lineTo: 1, curveTo: 2, quadraticCurveTo: 3, closePath: 4 } as const
+const DRAW = {
+  moveTo: 0,
+  lineTo: 1,
+  curveTo: 2,
+  quadraticCurveTo: 3,
+  closePath: 4,
+} as const
 
 type Mat = [number, number, number, number, number, number]
 
@@ -112,7 +118,9 @@ export function pdfOperatorPolylines(
     else if (fn === ops.constructPath && args) {
       const paintOp = args[0] as number
       if (paintOp === ops.endPath) continue // solo recorte
-      const data = (args[1] as ArrayLike<unknown> | undefined)?.[0] as ArrayLike<number> | null
+      const data = (
+        args[1] as ArrayLike<unknown> | undefined
+      )?.[0] as ArrayLike<number> | null
       if (!data) continue
       const filled = paintOp !== ops.stroke
       out.push(...drawOpsPolylines(data, ctm, filled))
@@ -121,8 +129,15 @@ export function pdfOperatorPolylines(
   return out
 }
 
-function drawOpsPolylines(data: ArrayLike<number>, m: Mat, filled: boolean): ImportedPolyline[] {
-  const tf = (x: number, y: number): Vec2 => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]
+function drawOpsPolylines(
+  data: ArrayLike<number>,
+  m: Mat,
+  filled: boolean,
+): ImportedPolyline[] {
+  const tf = (x: number, y: number): Vec2 => [
+    m[0] * x + m[2] * y + m[4],
+    m[1] * x + m[3] * y + m[5],
+  ]
   const out: ImportedPolyline[] = []
   let cur: Vec2[] = []
   let last: [number, number] = [0, 0]
@@ -131,7 +146,7 @@ function drawOpsPolylines(data: ArrayLike<number>, m: Mat, filled: boolean): Imp
     if (cur.length >= 2) out.push({ points: cur, closed: closed || filled })
     cur = []
   }
-  for (let i = 0; i < data.length; ) {
+  for (let i = 0; i < data.length;) {
     const op = data[i++]
     if (op === DRAW.moveTo) {
       flush(false)
@@ -149,8 +164,14 @@ function drawOpsPolylines(data: ArrayLike<number>, m: Mat, filled: boolean): Imp
         const u = 1 - t
         const [x, y] = cubic
           ? [
-              u * u * u * p0[0] + 3 * u * u * t * c[0] + 3 * u * t * t * c[2] + t * t * t * c[4],
-              u * u * u * p0[1] + 3 * u * u * t * c[1] + 3 * u * t * t * c[3] + t * t * t * c[5],
+              u * u * u * p0[0] +
+                3 * u * u * t * c[0] +
+                3 * u * t * t * c[2] +
+                t * t * t * c[4],
+              u * u * u * p0[1] +
+                3 * u * u * t * c[1] +
+                3 * u * t * t * c[3] +
+                t * t * t * c[5],
             ]
           : [
               u * u * p0[0] + 2 * u * t * c[0] + t * t * c[2],

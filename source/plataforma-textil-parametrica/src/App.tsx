@@ -4,7 +4,7 @@
  * La geometria se deriva del estado con funciones puras y se memoiza aca (una
  * sola vez), compartida entre el panel (stats, export) y la escena.
  */
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import './App.css'
 import { Viewport } from './scene/Viewport'
@@ -17,8 +17,18 @@ import { LaserView } from './components/LaserView'
 import { LaserPanel } from './components/LaserPanel'
 import { buildSpikeField } from './geometry/spikeField'
 import type { SpikePlacement } from './geometry/spikeField'
-import { buildWaveField } from './geometry/waveField'
-import { buildLaserCut, type LaserCutResult } from './geometry/laserCut'
+import type { WaveFieldResult } from './geometry/waveField'
+import {
+  computeWaveFieldSync,
+  createWaveFieldClient,
+  type WaveFieldJob,
+} from './workers/waveFieldClient'
+import type { LaserCutResult } from './geometry/laserCut'
+import {
+  computeLaserCutSync,
+  createLaserCutClient,
+  type LaserCutJob,
+} from './workers/laserCutClient'
 import { layoutOnBed, type BedLayout } from './geometry/laserBed'
 import { specimenParams } from './geometry/laserSpecimens'
 import { imageRect } from './geometry/laserImage'
@@ -39,8 +49,8 @@ export default function App() {
   const wavePlaneSize = useAppStore((s) => s.wave.planeSize)
 
   const spikes = useSpikeField()
-  const waves = useWaveFieldResult()
-  const laser = useLaserCut(mode === 'laser', spikes.placements)
+  const waves = useWaveFieldResult(mode === 'wave')
+  const [laser, laserPending] = useLaserCut(mode === 'laser', spikes.placements)
   const laserFamily = useAppStore((s) => s.laser.family)
   const laserSet = useAttractorSet('laser')
   const bed = useLaserBed(laser)
@@ -95,7 +105,7 @@ export default function App() {
             {mode === 'volume' && (
               <SpikeFieldScene geometry={spikes.geometry} planeSize={planeSize} />
             )}
-            {mode === 'wave' && (
+            {mode === 'wave' && waves && (
               <WaveFieldScene geometry={waves.geometry} planeSize={wavePlaneSize} />
             )}
           </Viewport>
@@ -149,9 +159,14 @@ export default function App() {
         </header>
 
         {mode === 'volume' && <SpikeFieldPanel result={spikes} />}
-        {mode === 'wave' && <WaveFieldPanel result={waves} />}
+        {mode === 'wave' && waves && <WaveFieldPanel result={waves} />}
         {mode === 'laser' && laser && (
-          <LaserPanel result={laser} bed={bed} spikeCount={spikes.placements.length} />
+          <LaserPanel
+            result={laser}
+            pending={laserPending}
+            bed={bed}
+            spikeCount={spikes.placements.length}
+          />
         )}
       </aside>
     </div>
@@ -201,7 +216,10 @@ function useDeleteShortcut(kind: AttractorSetKind | null) {
 /**
  * Corte laser (2D, mm). Solo se calcula con el modo activo: no hay malla que
  * liberar, pero recorrer la grilla en cada cambio de los modos 3D seria
- * trabajo perdido.
+ * trabajo perdido. Se calcula en un Web Worker (laserCutClient.ts) para que
+ * una pieza grande no congele la interfaz: mientras tanto se muestra el
+ * ultimo resultado listo. Solo el primero se calcula aca, para no arrancar
+ * con la vista vacia.
  */
 function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
   const laser = useAppStore((s) => s.laser)
@@ -211,7 +229,7 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
   const image = useAppStore((s) => s.laserImage)
   const specimen = useAppStore((s) => s.laserPiece === 'specimen')
 
-  return useMemo(() => {
+  const job = useMemo((): LaserCutJob | null => {
     if (!active) return null
     const footprints =
       laser.family === 'footprint'
@@ -221,14 +239,43 @@ function useLaserCut(active: boolean, placements: readonly SpikePlacement[]) {
             rootRadiusMm: p.rootRadiusMm,
           }))
         : []
-    // probeta: pieza fija de 200 x 200 (la forma importada no aplica).
-    return buildLaserCut(attractors, specimen ? specimenParams(laser) : laser, {
-      boundary: specimen ? null : baseShape,
-      footprints,
-      footprintPlaneMm: threeToMm(spikePlaneSize),
-      image,
-    })
+    // probeta: pieza fija de 200 x 200 (la forma importada no aplica). Al
+    // worker va solo lo que usa el calculo (sin las demas piezas ni la vista
+    // previa de la imagen).
+    return {
+      attractors,
+      params: specimen ? specimenParams(laser) : laser,
+      input: {
+        boundary:
+          specimen || !baseShape
+            ? null
+            : { outer: baseShape.outer, holes: baseShape.holes },
+        footprints,
+        footprintPlaneMm: threeToMm(spikePlaneSize),
+        image: image && { width: image.width, height: image.height, lum: image.lum },
+      },
+    }
   }, [active, laser, attractors, baseShape, placements, spikePlaneSize, image, specimen])
+
+  const [client] = useState(createLaserCutClient)
+  useEffect(() => () => client.dispose(), [client])
+  const [latest, setLatest] = useState<{
+    job: LaserCutJob
+    result: LaserCutResult
+  } | null>(null)
+  const hasResult = latest !== null
+  const first = useMemo(
+    () => (job && !hasResult ? computeLaserCutSync(job) : null),
+    [job, hasResult],
+  )
+  useEffect(() => {
+    if (job) client.run(job, (result) => setLatest({ job, result }))
+  }, [job, client])
+
+  if (!job) return [null, false] as const
+  if (!latest) return [first, false] as const
+  // pending: lo que se ve todavia no refleja el ultimo cambio (no exportar aun).
+  return [latest.result, latest.job !== job] as const
 }
 
 /** Imagen bajo los calados (familia imagen o imagen como campo), en mm de la pieza. */
@@ -281,16 +328,43 @@ function useSpikeField() {
   return result
 }
 
-function useWaveFieldResult() {
+/**
+ * Ondas solo se calcula con su modo activo: con una base grande (una falda de
+ * 1,2 m) armar la malla tarda segundos, y antes se rehacia en cada cambio de
+ * la base aunque se estuviera en Corte laser. Como el laser, va en un Web
+ * Worker (waveFieldClient.ts) y mientras tanto se ve la ultima malla lista;
+ * solo la primera se calcula aca.
+ */
+function useWaveFieldResult(active: boolean) {
   const wave = useAppStore((s) => s.wave)
   const attractors = useAppStore((s) => s.waveAttractors)
   const baseShape = useAppStore((s) => s.baseShape)
 
-  const result = useMemo(
-    () => buildWaveField(attractors, wave, baseShape),
-    [attractors, wave, baseShape],
+  const job = useMemo(
+    (): WaveFieldJob | null =>
+      active
+        ? {
+            attractors,
+            params: wave,
+            boundary: baseShape && { outer: baseShape.outer, holes: baseShape.holes },
+          }
+        : null,
+    [active, attractors, wave, baseShape],
   )
-  useDisposePrevious(result.geometry)
+  const [client] = useState(createWaveFieldClient)
+  useEffect(() => () => client.dispose(), [client])
+  const [latest, setLatest] = useState<WaveFieldResult | null>(null)
+  const hasResult = latest !== null
+  const first = useMemo(
+    () => (job && !hasResult ? computeWaveFieldSync(job) : null),
+    [job, hasResult],
+  )
+  useEffect(() => {
+    if (job) client.run(job, setLatest)
+  }, [job, client])
+
+  const result = job ? (latest ?? first) : null
+  useDisposePrevious(result?.geometry ?? null)
   return result
 }
 

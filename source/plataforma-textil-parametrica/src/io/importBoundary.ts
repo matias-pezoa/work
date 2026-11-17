@@ -46,9 +46,13 @@ export interface ImportedPolyline {
  * devuelve SOLO los lazos cerrados, sin repetir el primer vertice al final.
  * `tol`: distancia maxima entre extremos para considerarlos el mismo punto.
  */
-export function closedLoops(polylines: readonly ImportedPolyline[], tol: number): Vec2[][] {
+export function closedLoops(
+  polylines: readonly ImportedPolyline[],
+  tol: number,
+): Vec2[][] {
   const near = (a: Vec2, b: Vec2) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tol
-  const dropEnd = (pts: Vec2[]) => (pts.length > 1 && near(pts[0], pts[pts.length - 1]) ? pts.slice(0, -1) : pts)
+  const dropEnd = (pts: Vec2[]) =>
+    pts.length > 1 && near(pts[0], pts[pts.length - 1]) ? pts.slice(0, -1) : pts
 
   const loops: Vec2[][] = []
   const open: Vec2[][] = []
@@ -85,7 +89,8 @@ export function closedLoops(polylines: readonly ImportedPolyline[], tol: number)
         break
       }
     }
-    if (chain.length > 2 && near(chain[0], chain[chain.length - 1])) loops.push(dropEnd(chain))
+    if (chain.length > 2 && near(chain[0], chain[chain.length - 1]))
+      loops.push(dropEnd(chain))
   }
   return loops.filter((l) => l.length >= 3 && polygonArea(l) > 0)
 }
@@ -93,6 +98,50 @@ export function closedLoops(polylines: readonly ImportedPolyline[], tol: number)
 /** DXF y PDF tienen Y hacia arriba: se invierte para la convencion de `ImportedBoundary`. */
 export function flipLoopsY(loops: readonly Vec2[][]): Vec2[][] {
   return loops.map((l) => l.map(([x, y]): Vec2 => [x, -y]))
+}
+
+/** Ramer-Douglas-Peucker: saca vertices colineales (una recta muestreada queda en 2 puntos). */
+export function simplify(points: readonly Vec2[], eps: number): Vec2[] {
+  if (points.length < 3) return [...points]
+  const keep = new Array<boolean>(points.length).fill(false)
+  keep[0] = keep[points.length - 1] = true
+  const stack: [number, number][] = [[0, points.length - 1]]
+  while (stack.length) {
+    const [i, j] = stack.pop()!
+    const [ax, az] = points[i]
+    const [bx, bz] = points[j]
+    const len = Math.hypot(bx - ax, bz - az)
+    let best = -1
+    let idx = -1
+    for (let k = i + 1; k < j; k++) {
+      const [px, pz] = points[k]
+      const d =
+        len < 1e-12
+          ? Math.hypot(px - ax, pz - az)
+          : Math.abs((bx - ax) * (az - pz) - (ax - px) * (bz - az)) / len
+      if (d > best) {
+        best = d
+        idx = k
+      }
+    }
+    if (best > eps) {
+      keep[idx] = true
+      stack.push([i, idx], [idx, j])
+    }
+  }
+  return points.filter((_, k) => keep[k])
+}
+
+/**
+ * Lazo cerrado simplificado (RDP): un arco de PDF/DXF llega muestreado en
+ * cientos de vertices, y cada calado se compara con todo el borde. Con una
+ * tolerancia invisible (`eps`) la falda circular pasa de 1408 a ~190
+ * vertices y el diseno se genera 5-8 veces mas rapido.
+ */
+export function simplifyLoop(loop: readonly Vec2[], eps: number): Vec2[] {
+  if (loop.length <= 4) return [...loop]
+  const out = simplify([...loop, loop[0]], eps).slice(0, -1)
+  return out.length >= 3 ? out : [...loop]
 }
 
 /** Tolerancia de union de extremos: una fraccion pequena del tamano del dibujo. */
@@ -137,13 +186,22 @@ export function isSeamLine(inner: readonly Vec2[], outer: readonly Vec2[]): bool
  * dentro de un agujero (una isla) vuelve a ser pieza propia.
  * Las piezas salen de mayor a menor area.
  */
-export function loopsToPieces(loops: readonly Vec2[][], what: string): ImportedBoundary[] {
+export function loopsToPieces(
+  loops: readonly Vec2[][],
+  what: string,
+): ImportedBoundary[] {
   if (loops.length === 0) {
     throw new Error(
       `No se encontraron contornos cerrados en el ${what}. Revisa que la pieza este cerrada (sin tramos sueltos).`,
     )
   }
-  const sorted = [...loops].sort((a, b) => polygonArea(b) - polygonArea(a))
+  // tolerancia de simplificacion: 5e-5 de la diagonal del dibujo (~0,07 mm en
+  // una falda de 1,2 m), invisible en el corte.
+  const all = polygonBounds(loops.flat())
+  const eps = Math.hypot(all.maxX - all.minX, all.maxZ - all.minZ) * 5e-5
+  const sorted = loops
+    .map((l) => simplifyLoop(l, eps))
+    .sort((a, b) => polygonArea(b) - polygonArea(a))
   const pieces: ImportedBoundary[] = []
   for (const loop of sorted) {
     // la pieza contenedora mas chica (las piezas van de mayor a menor area).

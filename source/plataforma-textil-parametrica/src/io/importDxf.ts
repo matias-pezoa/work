@@ -42,7 +42,9 @@ export async function importDxfFile(file: File): Promise<ImportedShapes> {
 
 export function parseDxfToShapes(text: string): ImportedShapes {
   const dxf = parseDxf(text)
-  const polylines = dxf.entities.flatMap((e) => entityPolylines(e, dxf.blocks, IDENTITY, 0))
+  const polylines = dxf.entities.flatMap((e) =>
+    entityPolylines(e, dxf.blocks, IDENTITY, 0),
+  )
   const pieces = loopsToPieces(
     flipLoopsY(closedLoops(polylines, joinTolerance(polylines))),
     'DXF',
@@ -98,7 +100,8 @@ function readRecords(pairs: readonly Pair[]): Entity[] {
 
 function parseDxf(text: string): Dxf {
   const records = readRecords(readPairs(text))
-  if (!records.some((r) => r.type === 'SECTION')) throw new Error('El archivo no es un DXF valido.')
+  if (!records.some((r) => r.type === 'SECTION'))
+    throw new Error('El archivo no es un DXF valido.')
   let insUnits: number | undefined
   const entities: Entity[] = []
   const blocks = new Map<string, Block>()
@@ -110,7 +113,9 @@ function parseDxf(text: string): Dxf {
     if (r.type === 'SECTION') {
       section = str(r, 2).toUpperCase()
       if (section === 'HEADER') {
-        const k = r.pairs.findIndex(([c, v]) => c === 9 && v.toUpperCase() === '$INSUNITS')
+        const k = r.pairs.findIndex(
+          ([c, v]) => c === 9 && v.toUpperCase() === '$INSUNITS',
+        )
         const v = k >= 0 ? r.pairs[k + 1] : undefined
         if (v && v[0] === 70) insUnits = Number.parseInt(v[1], 10)
       }
@@ -239,7 +244,11 @@ function entityPolylines(
       const a0 = (num(e, 50) * Math.PI) / 180
       let a1 = (num(e, 51) * Math.PI) / 180
       while (a1 <= a0) a1 += 2 * Math.PI
-      return out(arcPoints(num(e, 10), num(e, 20), num(e, 40), a0, a1 - a0), false, ocs(e, m))
+      return out(
+        arcPoints(num(e, 10), num(e, 20), num(e, 40), a0, a1 - a0),
+        false,
+        ocs(e, m),
+      )
     }
     case 'ELLIPSE': {
       const [cx, cy] = [num(e, 10), num(e, 20)]
@@ -255,7 +264,10 @@ function entityPolylines(
       const n = Math.max(8, Math.ceil((t1 - t0) / ARC_STEP))
       const pts = Array.from({ length: full ? n : n + 1 }, (_, k): Vec2 => {
         const t = t0 + ((t1 - t0) * k) / n
-        return [cx + mx * Math.cos(t) + nx * Math.sin(t), cy + my * Math.cos(t) + ny * Math.sin(t)]
+        return [
+          cx + mx * Math.cos(t) + nx * Math.sin(t),
+          cy + my * Math.cos(t) + ny * Math.sin(t),
+        ]
       })
       return out(pts, full, m)
     }
